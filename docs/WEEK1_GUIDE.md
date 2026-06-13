@@ -76,6 +76,30 @@ enum TicketStatus {
   CANCELLED
 }
 
+enum SyncStatus {
+  PENDING   // logged offline, not yet sent to server
+  SYNCED    // reached the server, pending validation
+  ACCEPTED  // server confirmed this as the valid check-in (used in partial unique index)
+  FAILED    // rejected by server (duplicate or invalid)
+}
+
+enum ImportStatus {
+  PROCESSING
+  SUCCESS
+  FAILED
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum GuestStatus {
+  INVITED
+  CHECKED_IN
+}
+
 model User {
   id            String   @id @default(uuid())
   email         String   @unique
@@ -83,40 +107,42 @@ model User {
   role          Role     @default(AUDIENCE)
   createdAt     DateTime @default(now())
 
-  orders        Order[]
-  notifications Notification[]
+  orders         Order[]
+  notifications  Notification[]
+  scannedTickets Ticket[]       @relation("ScannerUser")
 }
 
 model Concert {
-  id          String        @id @default(uuid())
-  title       String
-  slug        String        @unique
-  venue       String
-  startsAt    DateTime
-  status      ConcertStatus @default(DRAFT)
-  artistBio   String?       @db.Text
+  id           String        @id @default(uuid())
+  title        String
+  slug         String        @unique
+  venue        String
+  startsAt     DateTime
+  status       ConcertStatus @default(DRAFT)
+  artistBio    String?       @db.Text
   bioSourceUrl String?
-  seatMapSvg  String?       @db.Text
-  createdAt   DateTime      @default(now())
+  seatMapSvg   String?       @db.Text
+  createdAt    DateTime      @default(now())
 
-  ticketTypes TicketType[]
-  orders      Order[]
-  guests      GuestListEntry[]
+  ticketTypes   TicketType[]
+  orders        Order[]
+  guests        GuestListEntry[]
+  importBatches CsvImportBatch[]
 }
 
 model TicketType {
   id           String   @id @default(uuid())
   concertId    String
-  name         String          // GA / SVIP / VIP / CAT1 / CAT2
-  price        Int             // store VND as integer, avoid float money bugs
+  name         String
+  price        Int
   totalQty     Int
-  remainingQty Int             // decremented atomically on purchase (mechanism #1)
-  maxPerUser   Int             // per-user cap (mechanism #6)
+  remainingQty Int
+  maxPerUser   Int
   saleStartsAt DateTime
 
-  concert      Concert     @relation(fields: [concertId], references: [id], onDelete: Cascade)
-  orderItems   OrderItem[]
-  tickets      Ticket[]
+  concert    Concert     @relation(fields: [concertId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+  tickets    Ticket[]
 
   @@index([concertId])
 }
@@ -127,17 +153,16 @@ model Order {
   concertId      String
   status         OrderStatus @default(PENDING)
   totalAmount    Int
-  idempotencyKey String?     @unique   // mechanism #4a — durable safety net (Redis is the fast pre-check)
-  expiresAt      DateTime?              // reservation hold expiry; BullMQ worker sweeps unpaid PENDING orders
+  idempotencyKey String?     @unique
+  expiresAt      DateTime?
   createdAt      DateTime    @default(now())
 
-  user       User        @relation(fields: [userId], references: [id])
-  concert    Concert     @relation(fields: [concertId], references: [id])
-  items      OrderItem[]
-  tickets    Ticket[]
+  user    User        @relation(fields: [userId], references: [id])
+  concert Concert     @relation(fields: [concertId], references: [id])
+  items   OrderItem[]
+  tickets Ticket[]
 
-  @@index([userId])
-  @@index([userId, concertId])         // fast per-user PAID count (mechanism #6) — no separate table needed
+  @@index([userId, concertId])
 }
 
 model OrderItem {
@@ -149,67 +174,74 @@ model OrderItem {
 
   order      Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
   ticketType TicketType @relation(fields: [ticketTypeId], references: [id])
+
+  @@index([orderId])
+  @@index([ticketTypeId])
 }
 
 model Ticket {
   id           String       @id @default(uuid())
   orderId      String
   ticketTypeId String
-  qrCode       String       @unique          // mechanism #4b base
+  qrCode       String       @unique
   status       TicketStatus @default(VALID)
   checkedInAt  DateTime?
   checkedInBy  String?
 
-  order      Order       @relation(fields: [orderId], references: [id])
-  ticketType TicketType  @relation(fields: [ticketTypeId], references: [id])
-  checkins   CheckinLog[]
+  order       Order       @relation(fields: [orderId], references: [id])
+  ticketType  TicketType  @relation(fields: [ticketTypeId], references: [id])
+  scannerUser User?       @relation("ScannerUser", fields: [checkedInBy], references: [id])
+  checkins    CheckinLog[]
 }
 
 model CheckinLog {
-  id         String   @id @default(uuid())
+  id         String     @id @default(uuid())
   ticketId   String
   deviceId   String
   scannedAt  DateTime
-  syncStatus String   @default("SYNCED")
+  syncStatus SyncStatus @default(PENDING)
 
   ticket Ticket @relation(fields: [ticketId], references: [id])
 
-  // partial unique below (added via raw migration) blocks double check-in
+  // partial unique (added via raw migration) blocks double check-in — see Option B below
   @@index([ticketId])
 }
 
 model GuestListEntry {
-  id            String  @id @default(uuid())
+  id            String      @id @default(uuid())
   concertId     String
   fullName      String
-  docId         String?
+  docId         String?     // NULL-safe dedup handled in application code — PostgreSQL treats NULLs as distinct in unique constraints
   zone          String
   sourceBatchId String
-  status        String  @default("INVITED")   // INVITED / CHECKED_IN
+  status        GuestStatus @default(INVITED)
 
-  concert Concert @relation(fields: [concertId], references: [id])
+  concert Concert @relation(fields: [concertId], references: [id], onDelete: Cascade)
 
-  @@unique([concertId, docId, sourceBatchId])  // dedup on import (mechanism #5)
+  @@unique([concertId, docId, sourceBatchId])
 }
 
 model CsvImportBatch {
-  id         String   @id @default(uuid())
+  id         String       @id @default(uuid())
+  concertId  String
   filename   String
-  checksum   String   @unique          // skip re-importing same file (mechanism #5)
-  status     String
+  checksum   String       @unique
+  status     ImportStatus @default(PROCESSING)
   rowsTotal  Int
   rowsOk     Int
   rowsFailed Int
-  createdAt  DateTime @default(now())
+  createdAt  DateTime     @default(now())
+
+  concert Concert @relation(fields: [concertId], references: [id], onDelete: Cascade)
 }
 
 model Notification {
-  id      String   @id @default(uuid())
+  id      String             @id @default(uuid())
   userId  String
-  channel String                       // EMAIL / IN_APP / (later) SMS, ZALO
+  channel String
   type    String
   payload Json
-  status  String   @default("PENDING")
+  status  NotificationStatus @default(PENDING)
   sentAt  DateTime?
 
   user User @relation(fields: [userId], references: [id])
@@ -230,7 +262,7 @@ CREATE UNIQUE INDEX one_checkin_per_ticket
 ```
 
 **Option B — unique on the successful CheckinLog.**
-If the log itself is the source of truth, put a partial unique on accepted check-ins only (so duplicate attempts can still be logged for audit):
+If the log itself is the source of truth, put a partial unique on accepted check-ins only (so duplicate attempts can still be logged for audit). `ACCEPTED` is a distinct `SyncStatus` value meaning the server confirmed this scan as valid:
 
 ```sql
 CREATE UNIQUE INDEX one_accepted_checkin_per_ticket
