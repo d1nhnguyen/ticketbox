@@ -1,0 +1,172 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  AUDIENCE
+  ORGANIZER
+  SCANNER
+}
+
+enum ConcertStatus {
+  DRAFT
+  ON_SALE
+  CANCELLED
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+  EXPIRED
+}
+
+enum TicketStatus {
+  VALID
+  USED
+  CANCELLED
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String
+  role          Role     @default(AUDIENCE)
+  createdAt     DateTime @default(now())
+
+  orders        Order[]
+  notifications Notification[]
+}
+
+model Concert {
+  id          String        @id @default(uuid())
+  title       String
+  slug        String        @unique
+  venue       String
+  startsAt    DateTime
+  status      ConcertStatus @default(DRAFT)
+  artistBio   String?       @db.Text
+  bioSourceUrl String?
+  seatMapSvg  String?       @db.Text
+  createdAt   DateTime      @default(now())
+
+  ticketTypes TicketType[]
+  orders      Order[]
+  guests      GuestListEntry[]
+}
+
+model TicketType {
+  id           String   @id @default(uuid())
+  concertId    String
+  name         String          // GA / SVIP / VIP / CAT1 / CAT2
+  price        Int             // store VND as integer, avoid float money bugs
+  totalQty     Int
+  remainingQty Int             // decremented atomically on purchase (mechanism #1)
+  maxPerUser   Int             // per-user cap (mechanism #6)
+  saleStartsAt DateTime
+
+  concert      Concert     @relation(fields: [concertId], references: [id], onDelete: Cascade)
+  orderItems   OrderItem[]
+  tickets      Ticket[]
+
+  @@index([concertId])
+}
+
+model Order {
+  id             String      @id @default(uuid())
+  userId         String
+  concertId      String
+  status         OrderStatus @default(PENDING)
+  totalAmount    Int
+  idempotencyKey String?     @unique   // mechanism #4a — durable safety net (Redis is the fast pre-check)
+  expiresAt      DateTime?              // reservation hold expiry; BullMQ worker sweeps unpaid PENDING orders
+  createdAt      DateTime    @default(now())
+
+  user       User        @relation(fields: [userId], references: [id])
+  concert    Concert     @relation(fields: [concertId], references: [id])
+  items      OrderItem[]
+  tickets    Ticket[]
+
+  @@index([userId])
+  @@index([userId, concertId])         // fast per-user PAID count (mechanism #6) — no separate table needed
+}
+
+model OrderItem {
+  id           String @id @default(uuid())
+  orderId      String
+  ticketTypeId String
+  quantity     Int
+  unitPrice    Int
+
+  order      Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  ticketType TicketType @relation(fields: [ticketTypeId], references: [id])
+}
+
+model Ticket {
+  id           String       @id @default(uuid())
+  orderId      String
+  ticketTypeId String
+  qrCode       String       @unique          // mechanism #4b base
+  status       TicketStatus @default(VALID)
+  checkedInAt  DateTime?
+  checkedInBy  String?
+
+  order      Order       @relation(fields: [orderId], references: [id])
+  ticketType TicketType  @relation(fields: [ticketTypeId], references: [id])
+  checkins   CheckinLog[]
+}
+
+model CheckinLog {
+  id         String   @id @default(uuid())
+  ticketId   String
+  deviceId   String
+  scannedAt  DateTime
+  syncStatus String   @default("SYNCED")
+
+  ticket Ticket @relation(fields: [ticketId], references: [id])
+
+  // partial unique below (added via raw migration) blocks double check-in
+  @@index([ticketId])
+}
+
+model GuestListEntry {
+  id            String  @id @default(uuid())
+  concertId     String
+  fullName      String
+  docId         String?
+  zone          String
+  sourceBatchId String
+  status        String  @default("INVITED")   // INVITED / CHECKED_IN
+
+  concert Concert @relation(fields: [concertId], references: [id])
+
+  @@unique([concertId, docId, sourceBatchId])  // dedup on import (mechanism #5)
+}
+
+model CsvImportBatch {
+  id         String   @id @default(uuid())
+  filename   String
+  checksum   String   @unique          // skip re-importing same file (mechanism #5)
+  status     String
+  rowsTotal  Int
+  rowsOk     Int
+  rowsFailed Int
+  createdAt  DateTime @default(now())
+}
+
+model Notification {
+  id      String   @id @default(uuid())
+  userId  String
+  channel String                       // EMAIL / IN_APP / (later) SMS, ZALO
+  type    String
+  payload Json
+  status  String   @default("PENDING")
+  sentAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+}
