@@ -23,7 +23,6 @@ export class ConcertsService {
   }
 
   findBySlug(slug: string) {
-    console.log('Finding slug:', slug);
     return this.prisma.concert.findUnique({
       where: { slug },
       include: {
