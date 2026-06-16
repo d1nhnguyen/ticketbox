@@ -195,21 +195,32 @@ const Login = () => {
     setError('');
     setLoading(true);
     try {
-      // Gọi API Auth của Person A
+      // 1. Gọi API
       const res = await axios.post('http://localhost:3000/auth/login', { email, password });
       
-      // Giả sử API trả về { accessToken: "...", user: { role: "..." } }
-      const token = res.data.accessToken || 'mock-token';
-      const role = res.data.user?.role || res.data.role || 'AUDIENCE'; 
+      // 2. Lấy access_token từ đúng key của backend trả về
+      const token = res.data.access_token;
       
+      if (!token) throw new Error("Không nhận được token");
+
+      // 3. Giải mã JWT token (Payload nằm ở phần thứ 2 của chuỗi, cách nhau bởi dấu chấm)
+      const payloadBase64 = token.split('.')[1];
+      const decodedPayload = JSON.parse(atob(payloadBase64));
+      
+      // 4. Lấy role từ payload đã giải mã
+      const role = decodedPayload.role; 
+      
+      // 5. Cập nhật state
       login(token, role);
       
+      // 6. Chuyển hướng
       if (role === 'ORGANIZER') navigate('/admin');
       else if (role === 'SCANNER') navigate('/scanner');
       else navigate('/');
+      
     } catch (err) {
       console.error(err);
-      setError('Đăng nhập thất bại. Vui lòng kiểm tra lại Email/Password hoặc trạng thái Backend.');
+      setError('Đăng nhập thất bại. Vui lòng kiểm tra lại Email/Password!');
     } finally {
       setLoading(false);
     }
