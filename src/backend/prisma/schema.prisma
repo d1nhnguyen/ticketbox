@@ -1,0 +1,204 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  AUDIENCE
+  ORGANIZER
+  SCANNER
+}
+
+enum ConcertStatus {
+  DRAFT
+  ON_SALE
+  CANCELLED
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+  EXPIRED
+}
+
+enum TicketStatus {
+  VALID
+  USED
+  CANCELLED
+}
+
+enum SyncStatus {
+  PENDING   // logged offline, not yet sent to server
+  SYNCED    // reached the server, pending validation
+  ACCEPTED  // server confirmed this as the valid check-in (used in partial unique index)
+  FAILED    // rejected by server (duplicate or invalid)
+}
+
+enum ImportStatus {
+  PROCESSING
+  SUCCESS
+  FAILED
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum GuestStatus {
+  INVITED
+  CHECKED_IN
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String
+  role          Role     @default(AUDIENCE)
+  createdAt     DateTime @default(now())
+
+  orders         Order[]
+  notifications  Notification[]
+  scannedTickets Ticket[]       @relation("ScannerUser")
+}
+
+model Concert {
+  id           String        @id @default(uuid())
+  title        String
+  slug         String        @unique
+  venue        String
+  startsAt     DateTime
+  status       ConcertStatus @default(DRAFT)
+  artistBio    String?       @db.Text
+  bioSourceUrl String?
+  seatMapSvg   String?       @db.Text
+  createdAt    DateTime      @default(now())
+
+  ticketTypes   TicketType[]
+  orders        Order[]
+  guests        GuestListEntry[]
+  importBatches CsvImportBatch[]
+}
+
+model TicketType {
+  id           String   @id @default(uuid())
+  concertId    String
+  name         String
+  price        Int
+  totalQty     Int
+  remainingQty Int
+  maxPerUser   Int
+  saleStartsAt DateTime
+
+  concert    Concert     @relation(fields: [concertId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+  tickets    Ticket[]
+
+  @@index([concertId])
+}
+
+model Order {
+  id             String      @id @default(uuid())
+  userId         String
+  concertId      String
+  status         OrderStatus @default(PENDING)
+  totalAmount    Int
+  idempotencyKey String?     @unique
+  expiresAt      DateTime?
+  createdAt      DateTime    @default(now())
+
+  user    User        @relation(fields: [userId], references: [id])
+  concert Concert     @relation(fields: [concertId], references: [id])
+  items   OrderItem[]
+  tickets Ticket[]
+
+  @@index([userId, concertId])
+}
+
+model OrderItem {
+  id           String @id @default(uuid())
+  orderId      String
+  ticketTypeId String
+  quantity     Int
+  unitPrice    Int
+
+  order      Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  ticketType TicketType @relation(fields: [ticketTypeId], references: [id])
+
+  @@index([orderId])
+  @@index([ticketTypeId])
+}
+
+model Ticket {
+  id           String       @id @default(uuid())
+  orderId      String
+  ticketTypeId String
+  qrCode       String       @unique
+  status       TicketStatus @default(VALID)
+  checkedInAt  DateTime?
+  checkedInBy  String?
+
+  order       Order       @relation(fields: [orderId], references: [id])
+  ticketType  TicketType  @relation(fields: [ticketTypeId], references: [id])
+  scannerUser User?       @relation("ScannerUser", fields: [checkedInBy], references: [id])
+  checkins    CheckinLog[]
+}
+
+model CheckinLog {
+  id         String     @id @default(uuid())
+  ticketId   String
+  deviceId   String
+  scannedAt  DateTime
+  syncStatus SyncStatus @default(PENDING)
+
+  ticket Ticket @relation(fields: [ticketId], references: [id])
+
+  // partial unique (added via raw migration) blocks double check-in — see WEEK1_GUIDE.md Option B
+  @@index([ticketId])
+}
+
+model GuestListEntry {
+  id            String      @id @default(uuid())
+  concertId     String
+  fullName      String
+  docId         String?     // NULL-safe dedup handled in application code — see note in WEEK1_GUIDE.md
+  zone          String
+  sourceBatchId String
+  status        GuestStatus @default(INVITED)
+
+  concert Concert @relation(fields: [concertId], references: [id], onDelete: Cascade)
+
+  @@unique([concertId, docId, sourceBatchId])
+}
+
+model CsvImportBatch {
+  id         String       @id @default(uuid())
+  concertId  String
+  filename   String
+  checksum   String       @unique
+  status     ImportStatus @default(PROCESSING)
+  rowsTotal  Int
+  rowsOk     Int
+  rowsFailed Int
+  createdAt  DateTime     @default(now())
+
+  concert Concert @relation(fields: [concertId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id      String             @id @default(uuid())
+  userId  String
+  channel String
+  type    String
+  payload Json
+  status  NotificationStatus @default(PENDING)
+  sentAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+}

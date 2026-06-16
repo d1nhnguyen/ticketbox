@@ -1,0 +1,17 @@
+[
+  {
+    "email": "audience@ticketbox.dev",
+    "password": "password123",
+    "role": "AUDIENCE"
+  },
+  {
+    "email": "organizer@ticketbox.dev",
+    "password": "password123",
+    "role": "ORGANIZER"
+  },
+  {
+    "email": "scanner@ticketbox.dev",
+    "password": "password123",
+    "role": "SCANNER"
+  }
+]
