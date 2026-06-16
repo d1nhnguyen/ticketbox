@@ -5,6 +5,7 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { ConcertsModule } from './concerts/concerts.module';
 import { CommonModule } from './common/common.module';
+import { PaymentModule } from './payment/payment.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { CommonModule } from './common/common.module';
     CommonModule,
     AuthModule,
     ConcertsModule,
+    PaymentModule,
   ],
   controllers: [AppController],
   providers: [AppService],
