@@ -1,0 +1,178 @@
+[
+  {
+    "title": "Anh Trai Say Hi",
+    "slug": "anh-trai-say-hi",
+    "venue": "SVĐ Mỹ Đình, Hà Nội",
+    "startsAt": "2026-08-15T19:00:00Z",
+    "status": "ON_SALE",
+    "ticketTypes": [
+      {
+        "name": "SVIP",
+        "price": 5000000,
+        "totalQty": 200,
+        "maxPerUser": 2,
+        "saleStartsAt": "2026-06-20T12:00:00Z"
+      },
+      {
+        "name": "VIP",
+        "price": 3000000,
+        "totalQty": 1000,
+        "maxPerUser": 4,
+        "saleStartsAt": "2026-06-20T12:00:00Z"
+      },
+      {
+        "name": "CAT1",
+        "price": 2000000,
+        "totalQty": 5000,
+        "maxPerUser": 4,
+        "saleStartsAt": "2026-06-20T12:00:00Z"
+      },
+      {
+        "name": "CAT2",
+        "price": 1200000,
+        "totalQty": 8000,
+        "maxPerUser": 6,
+        "saleStartsAt": "2026-06-20T12:00:00Z"
+      },
+      {
+        "name": "GA",
+        "price": 800000,
+        "totalQty": 15000,
+        "maxPerUser": 6,
+        "saleStartsAt": "2026-06-20T12:00:00Z"
+      }
+    ]
+  },
+  {
+    "title": "Anh Trai Vượt Ngàn Chông Gai",
+    "slug": "anh-trai-vuot-ngan-chong-gai",
+    "venue": "SVĐ Quân khu 7, TP.HCM",
+    "startsAt": "2026-08-22T19:00:00Z",
+    "status": "ON_SALE",
+    "ticketTypes": [
+      {
+        "name": "SVIP",
+        "price": 5500000,
+        "totalQty": 200,
+        "maxPerUser": 2,
+        "saleStartsAt": "2026-06-20T12:00:00Z"
+      },
+      {
+        "name": "VIP",
+        "price": 3200000,
+        "totalQty": 1000,
+        "maxPerUser": 4,
+        "saleStartsAt": "2026-06-20T12:00:00Z"
+      },
+      {
+        "name": "CAT1",
+        "price": 2100000,
+        "totalQty": 5000,
+        "maxPerUser": 4,
+        "saleStartsAt": "2026-06-20T12:00:00Z"
+      },
+      {
+        "name": "CAT2",
+        "price": 1300000,
+        "totalQty": 8000,
+        "maxPerUser": 6,
+        "saleStartsAt": "2026-06-20T12:00:00Z"
+      },
+      {
+        "name": "GA",
+        "price": 850000,
+        "totalQty": 15000,
+        "maxPerUser": 6,
+        "saleStartsAt": "2026-06-20T12:00:00Z"
+      }
+    ]
+  },
+  {
+    "title": "Em Xinh Say Hi",
+    "slug": "em-xinh-say-hi",
+    "venue": "SVĐ Thống Nhất, TP.HCM",
+    "startsAt": "2026-09-05T19:00:00Z",
+    "status": "ON_SALE",
+    "ticketTypes": [
+      {
+        "name": "SVIP",
+        "price": 4800000,
+        "totalQty": 200,
+        "maxPerUser": 2,
+        "saleStartsAt": "2026-06-20T12:00:00Z"
+      },
+      {
+        "name": "VIP",
+        "price": 2900000,
+        "totalQty": 1000,
+        "maxPerUser": 4,
+        "saleStartsAt": "2026-06-20T12:00:00Z"
+      },
+      {
+        "name": "CAT1",
+        "price": 1900000,
+        "totalQty": 5000,
+        "maxPerUser": 4,
+        "saleStartsAt": "2026-06-20T12:00:00Z"
+      },
+      {
+        "name": "CAT2",
+        "price": 1100000,
+        "totalQty": 8000,
+        "maxPerUser": 6,
+        "saleStartsAt": "2026-06-20T12:00:00Z"
+      },
+      {
+        "name": "GA",
+        "price": 750000,
+        "totalQty": 15000,
+        "maxPerUser": 6,
+        "saleStartsAt": "2026-06-20T12:00:00Z"
+      }
+    ]
+  },
+  {
+    "title": "Chị Đẹp Đạp Gió Rẽ Sóng",
+    "slug": "chi-dep-dap-gio-re-song",
+    "venue": "SVĐ Cần Thơ",
+    "startsAt": "2026-09-19T19:00:00Z",
+    "status": "ON_SALE",
+    "ticketTypes": [
+      {
+        "name": "SVIP",
+        "price": 4500000,
+        "totalQty": 200,
+        "maxPerUser": 2,
+        "saleStartsAt": "2026-06-20T12:00:00Z"
+      },
+      {
+        "name": "VIP",
+        "price": 2700000,
+        "totalQty": 1000,
+        "maxPerUser": 4,
+        "saleStartsAt": "2026-06-20T12:00:00Z"
+      },
+      {
+        "name": "CAT1",
+        "price": 1800000,
+        "totalQty": 5000,
+        "maxPerUser": 4,
+        "saleStartsAt": "2026-06-20T12:00:00Z"
+      },
+      {
+        "name": "CAT2",
+        "price": 1000000,
+        "totalQty": 8000,
+        "maxPerUser": 6,
+        "saleStartsAt": "2026-06-20T12:00:00Z"
+      },
+      {
+        "name": "GA",
+        "price": 700000,
+        "totalQty": 15000,
+        "maxPerUser": 6,
+        "saleStartsAt": "2026-06-20T12:00:00Z"
+      }
+    ]
+  }
+]
