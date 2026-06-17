@@ -61,12 +61,14 @@ Passwords exist in [users.json](../data/seed/users.json) but the guide requires 
 
 ## PERSON B — Infra & Integrations
 
-### B2. Validate required env vars on boot 🟡
+### B2. Validate required env vars on boot -  DONE
 
 `ConfigModule.forRoot` has no schema ([app.module.ts](../src/backend/src/app.module.ts)).
 
-- [ ] Add a `validationSchema` (Joi) requiring `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET` so a
-      misconfigured deploy fails fast at startup.
+- Added [`src/config/env.validation.ts`](../src/backend/src/config/env.validation.ts) — Joi schema
+
+- **Verified fail-fast:** boot with `JWT_SECRET=""` → immediate crash with
+      `Error: Config validation error: JWT_SECRET must be at least 15 characters long`.
 
 ---
 
