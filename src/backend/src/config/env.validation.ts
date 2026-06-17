@@ -43,7 +43,11 @@ export const envValidationSchema = Joi.object({
   CIRCUIT_BREAKER_RESET_TIMEOUT_MS: Joi.number().integer().positive().default(10000),
   CIRCUIT_BREAKER_VOL_THRESHOLD: Joi.number().integer().positive().default(5),
 
-  // Rate limiting
+  // Rate limiting — global bucket
   RATE_LIMIT_CAPACITY: Joi.number().integer().positive().default(100),
   RATE_LIMIT_REFILL_RATE: Joi.number().positive().default(10),
+
+  // Rate limiting — payment/purchase endpoints (stricter bucket)
+  PAYMENT_RATE_LIMIT_CAPACITY: Joi.number().integer().positive().default(20),
+  PAYMENT_RATE_LIMIT_REFILL_RATE: Joi.number().positive().default(2),
 });
