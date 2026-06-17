@@ -13,13 +13,3 @@ export interface PaymentResponse {
   orderId: string;
   amount: number;
 }
-
-/** Shape returned when the circuit is OPEN (graceful degradation) */
-export interface PaymentFallbackResponse {
-  status: 'unavailable';
-  orderId: string;
-  message: string;
-  retryAfterMs?: number;
-}
-
-export type PaymentResult = PaymentResponse | PaymentFallbackResponse;

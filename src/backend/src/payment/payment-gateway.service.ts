@@ -1,12 +1,10 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const CircuitBreaker = require('opossum');
 import {
   PaymentRequest,
   PaymentResponse,
-  PaymentFallbackResponse,
-  PaymentResult,
 } from './payment.types';
 
 /**
@@ -82,16 +80,19 @@ export class PaymentGatewayService implements OnModuleInit {
       this.logger.warn(`[CircuitBreaker] Request rejected — circuit is OPEN`),
     );
 
-    // Fallback executed when the circuit is OPEN
-    this.breaker.fallback((req: PaymentRequest) => {
-      const fallback: PaymentFallbackResponse = {
-        status: 'unavailable',
-        orderId: req.orderId,
+    // Fallback executed when the circuit is OPEN or times out.
+    // Throws ServiceUnavailableException (HTTP 503) so callers get the correct
+    // HTTP status and can show a proper error to the user.
+    // Browsing/listing endpoints have NO dependency on this call — graceful degradation
+    // means only payment fails, not the whole app.
+    this.breaker.fallback((_req: PaymentRequest) => {
+      throw new ServiceUnavailableException({
+        statusCode: 503,
+        error: 'Service Unavailable',
         message:
-          'Payment service is currently unavailable. Your order is saved. Please retry in a moment.',
+          'Payment service is temporarily unavailable. Your order has been saved. Please retry in a moment.',
         retryAfterMs: resetTimeoutMs,
-      };
-      return fallback;
+      });
     });
 
     this.logger.log(
@@ -100,10 +101,12 @@ export class PaymentGatewayService implements OnModuleInit {
   }
 
   /**
-   * Charge a payment. Returns success response OR a graceful fallback when circuit is OPEN.
+   * Charge a payment.
+   * - Circuit CLOSED → calls mock-gateway, returns PaymentResponse.
+   * - Circuit OPEN   → fallback throws ServiceUnavailableException (HTTP 503).
    */
-  async charge(req: PaymentRequest): Promise<PaymentResult> {
-    return this.breaker.fire(req) as Promise<PaymentResult>;
+  async charge(req: PaymentRequest): Promise<PaymentResponse> {
+    return this.breaker.fire(req) as Promise<PaymentResponse>;
   }
 
   /**
