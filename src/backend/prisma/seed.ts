@@ -6,6 +6,14 @@ import * as path from 'path';
 const prisma = new PrismaClient();
 
 async function main() {
+  // Idempotency guard: skip if already seeded so container restarts don't wipe demo data.
+  // Set FORCE_SEED=1 to re-seed from scratch (dev only).
+  const alreadySeeded = (await prisma.concert.count()) > 0;
+  if (alreadySeeded && process.env.FORCE_SEED !== '1') {
+    console.log('✅ Database already seeded — skipping (set FORCE_SEED=1 to re-seed).');
+    return;
+  }
+
   console.log('🧹 Wiping tables...');
   await prisma.checkinLog.deleteMany();
   await prisma.ticket.deleteMany();

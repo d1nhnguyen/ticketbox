@@ -8,22 +8,22 @@
 
 ---
 
-## 🔴 BLOCKER — `docker-compose up` doesn't migrate or seed
+## ✅ BLOCKER RESOLVED — `docker-compose up` now migrates + seeds
 
-Owner: **B** (with A)
+Owner: **B** (with A) · verified live on a clean volume
 
-The backend container runs `node dist/src/main.js` directly ([Dockerfile](../src/backend/Dockerfile)).
-Nothing runs `prisma migrate deploy` or the seed at start, so on a clean checkout the
-backend boots against a DB with **no tables** → every `/concerts` query 500s. Day 5 gate
-items 1 (“no manual steps”) and 2 (`npm run seed` → 4 concerts) both fail.
+- [x] Added [docker-entrypoint.sh](../src/backend/docker-entrypoint.sh): runs
+      `prisma migrate deploy` → seed → `node dist/main.js`; wired as the backend `ENTRYPOINT`.
+- [x] Made the seed idempotent ([seed.ts](../src/backend/prisma/seed.ts)) — skips if already
+      seeded so restarts don't wipe demo data (`FORCE_SEED=1` to force a re-seed).
+- [x] Added [.dockerignore](../src/backend/.dockerignore) so the host's Windows `node_modules`
+      no longer clobbers the Alpine Prisma client in the image (also for mock-gateway).
+- [x] Fixed the build-output path (`dist/main.js`, not `dist/src/main.js`) in the entrypoint
+      and `start:prod`.
 
-- [ ] Add an entrypoint/command that runs migrations + seed before the app starts, e.g.
-      `npx prisma migrate deploy && npm run seed && npm run start:prod`
-      (a `docker-entrypoint.sh` or a compose `command:` override).
-- [ ] Make the seed idempotent or guarded so restarts don't crash on re-seed.
-
-**Done when:** `docker-compose up` on a fresh clone → backend healthy → `GET /concerts`
-returns the 4 seeded concerts with zero manual steps.
+**Verified:** `docker compose down -v && docker compose up -d --build` → migrations apply →
+4 concerts + 3 users seed → `GET /concerts` returns all 4 concerts, zero manual steps.
+Restart re-run logs "Database already seeded — skipping".
 
 ---
 
