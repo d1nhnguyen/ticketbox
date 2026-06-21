@@ -10,7 +10,10 @@ export const REDIS_CLIENT = 'REDIS_CLIENT';
     {
       provide: REDIS_CLIENT,
       useFactory: (configService: ConfigService): Redis => {
-        const redisUrl = configService.get<string>('REDIS_URL', 'redis://localhost:6379');
+        const redisUrl = configService.get<string>(
+          'REDIS_URL',
+          'redis://localhost:6379',
+        );
         const client = new Redis(redisUrl, {
           maxRetriesPerRequest: 3,
           retryStrategy: (times) => Math.min(times * 100, 3000),
@@ -18,7 +21,9 @@ export const REDIS_CLIENT = 'REDIS_CLIENT';
         });
 
         client.on('connect', () => console.log('[Redis] Connected'));
-        client.on('error', (err) => console.error('[Redis] Error:', err.message));
+        client.on('error', (err) =>
+          console.error('[Redis] Error:', err.message),
+        );
 
         return client;
       },

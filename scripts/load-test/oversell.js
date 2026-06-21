@@ -51,7 +51,10 @@ async function run() {
   console.log(`✅ Found SVIP ticket type: ID = ${svip.id}, totalQty = ${svip.totalQty}, remainingQty = ${svip.remainingQty}`);
 
   if (svip.remainingQty < svip.totalQty) {
-    console.log('⚠️ Warning: Stock is already partially sold. Please run "npm run seed" on backend first.');
+    console.log('⚠️ Warning: Stock is already partially sold. Reset it before testing —');
+    console.log('   plain "npm run seed" is a no-op once the DB is seeded; you must force it:');
+    console.log('   (from src/backend)  FORCE_SEED=1 npm run seed');
+    console.log('   PowerShell:         $env:FORCE_SEED="1"; npm run seed');
   }
 
   const ticketTypeId = svip.id;
