@@ -35,9 +35,11 @@ export class RateLimitService {
       lastRefillMs = nowMs
     end
 
-    -- Calculate how many tokens have refilled since last check
+    -- Calculate how many tokens have refilled since last check.
+    -- Keep tokens fractional: flooring here would discard sub-token elapsed
+    -- time on every call and stall refill under sustained sub-interval traffic.
     local elapsedMs    = math.max(0, nowMs - lastRefillMs)
-    local refilled     = math.floor(elapsedMs * refillRate / 1000)
+    local refilled     = elapsedMs * refillRate / 1000
     tokens             = math.min(capacity, tokens + refilled)
     lastRefillMs       = nowMs
 
@@ -56,7 +58,8 @@ export class RateLimitService {
     -- TTL: expire bucket after capacity/refillRate seconds of inactivity × 2
     redis.call("PEXPIRE", key, math.ceil(capacity / refillRate * 2000))
 
-    return { allowed, tokens, retryAfterMs }
+    -- Store fractional tokens, but report a whole number to clients
+    return { allowed, math.floor(tokens), retryAfterMs }
   `;
 
   constructor(@Inject(REDIS_CLIENT) private readonly redis: Redis) {}
