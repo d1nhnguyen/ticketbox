@@ -1,32 +1,36 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useContext, useState } from 'react';
 
-type Role = 'AUDIENCE' | 'ORGANIZER' | 'SCANNER' | null;
+export type Role = 'AUDIENCE' | 'ORGANIZER' | 'SCANNER' | null;
 
 interface AuthContextType {
   role: Role;
-  login: (selectedRole: Role) => void;
+  token: string | null;
+  login: (token: string, selectedRole: Role) => void;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [role, setRole] = useState<Role>(null);
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const [role, setRole] = useState<Role>((localStorage.getItem('role') as Role) || null);
+  const [token, setToken] = useState<string | null>(localStorage.getItem('token') || null);
 
-  
-  const login = (selectedRole: Role) => {
-    setRole(selectedRole);
-    
-    localStorage.setItem('temp_role', selectedRole || ''); 
+  const login = (newToken: string, newRole: Role) => {
+    setToken(newToken);
+    setRole(newRole);
+    localStorage.setItem('token', newToken);
+    if (newRole) localStorage.setItem('role', newRole);
   };
 
   const logout = () => {
+    setToken(null);
     setRole(null);
-    localStorage.removeItem('temp_role');
+    localStorage.removeItem('token');
+    localStorage.removeItem('role');
   };
 
   return (
-    <AuthContext.Provider value={{ role, login, logout }}>
+    <AuthContext.Provider value={{ role, token, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
