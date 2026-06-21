@@ -112,6 +112,15 @@ export class PaymentGatewayService implements OnModuleInit {
   /**
    * Expose current circuit breaker state for health/monitoring endpoints.
    */
+  /**
+   * Reset circuit breaker back to CLOSED state.
+   * Useful for demo/testing without restarting the backend.
+   */
+  reset(): void {
+    this.breaker.close();
+    this.logger.log('[CircuitBreaker] Manually reset to CLOSED state');
+  }
+
   getStatus(): {
     state: string;
     stats: {

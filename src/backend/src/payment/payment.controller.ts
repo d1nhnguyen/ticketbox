@@ -52,4 +52,18 @@ export class PaymentController {
   circuitBreakerStatus() {
     return this.gatewayService.getStatus();
   }
+
+  /**
+   * Reset circuit breaker to CLOSED state.
+   * Only for demo/dev — does NOT need auth (no sensitive data exposed).
+   * Skip rate limit so the test script can always call this.
+   */
+  @SkipRateLimit()
+  @Post('reset')
+  resetCircuitBreaker() {
+    this.gatewayService.reset();
+    const status = this.gatewayService.getStatus();
+    this.logger.log('[PaymentController] Circuit breaker reset via API');
+    return { message: 'Circuit breaker reset to CLOSED', state: status.state };
+  }
 }
