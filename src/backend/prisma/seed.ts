@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import * as fs from 'fs';
 import * as path from 'path';
+import Redis from 'ioredis';
 
 const prisma = new PrismaClient();
 
@@ -65,6 +66,24 @@ async function main() {
     console.log(`  ✓ ${c.title} (${c.ticketTypes.length} ticket types)`);
   }
 
+  // ---- Flush Redis cache so stale UUIDs don't linger after re-seed ----
+  const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+  const redis = new Redis(redisUrl);
+  let flushedCount = 0;
+  for (const pattern of ['cache:concert:*', 'idemp:*']) {
+    let cursor = '0';
+    do {
+      const [nextCursor, keys] = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+      cursor = nextCursor;
+      if (keys.length > 0) {
+        await redis.del(...keys);
+        flushedCount += keys.length;
+      }
+    } while (cursor !== '0');
+  }
+  await redis.quit();
+  console.log(`🗑️  Redis cache flushed (${flushedCount} key(s) removed).`);
+
   console.log('✅ Seed completed.');
 }
 
@@ -76,3 +95,4 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
+

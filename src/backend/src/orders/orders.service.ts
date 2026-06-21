@@ -11,12 +11,14 @@ import Redis from 'ioredis';
 import { TicketType, OrderStatus } from '@prisma/client';
 import { PurchaseDto } from './dto/purchase.dto';
 import { randomUUID } from 'crypto';
+import { CacheService } from 'src/common/cache/cache.service';
 
 @Injectable()
 export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
+    private readonly cacheService: CacheService,
   ) {}
 
   async createOrder(userId: string, dto: PurchaseDto, idempotencyKey?: string) {
@@ -42,7 +44,7 @@ export class OrdersService {
     }
 
     try {
-      const order = await this.prisma.$transaction(async (tx) => {
+      const txResult = await this.prisma.$transaction(async (tx) => {
         // ---- lock the ticket type row → serializes all buyers of this type ----
         const rows = await tx.$queryRaw<TicketType[]>`
           SELECT * FROM "TicketType" WHERE id = ${dto.ticketTypeId} FOR UPDATE
@@ -51,6 +53,11 @@ export class OrdersService {
         if (!tt) {
           throw new NotFoundException('Ticket type not found');
         }
+
+        const concert = await tx.concert.findUnique({
+          where: { id: tt.concertId },
+          select: { slug: true }
+        });
 
         // ---- sale window ----
         if (new Date() < new Date(tt.saleStartsAt)) {
@@ -84,7 +91,7 @@ export class OrdersService {
         }
 
         // ---- create PENDING order (10-min hold) ----
-        return tx.order.create({
+        const newOrder = await tx.order.create({
           data: {
             userId,
             concertId: tt.concertId,
@@ -104,7 +111,18 @@ export class OrdersService {
           },
           include: { items: true },
         });
+
+        return { order: newOrder, concertSlug: concert?.slug };
       });
+
+      const { order, concertSlug } = txResult;
+
+      if (concertSlug) {
+        console.log(`[OrdersService] Invalidating cache for slug: ${concertSlug}`);
+        await this.cacheService.invalidateConcert(concertSlug);
+      } else {
+        console.warn(`[OrdersService] No concertSlug found to invalidate!`);
+      }
 
       // store the result so a duplicate key returns the SAME order
       await this.redis.set(
