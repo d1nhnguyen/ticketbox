@@ -116,9 +116,27 @@ export class RateLimitGuard implements CanActivate {
     return true;
   }
 
+  private getUserIdFromHeader(req: Request): string | undefined {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return undefined;
+    }
+    const token = authHeader.substring(7);
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) return undefined;
+      const payloadBase64 = parts[1];
+      const payloadJson = Buffer.from(payloadBase64, 'base64').toString('utf8');
+      const payload = JSON.parse(payloadJson);
+      return payload.sub;
+    } catch {
+      return undefined;
+    }
+  }
+
   private buildKey(req: Request, strategy: string): string {
     const ip = this.getClientIp(req);
-    const userId = (req as any).user?.sub ?? (req as any).user?.id;
+    const userId = (req as any).user?.userId ?? (req as any).user?.sub ?? (req as any).user?.id ?? this.getUserIdFromHeader(req);
 
     switch (strategy) {
       case 'user':
