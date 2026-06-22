@@ -8,6 +8,14 @@ export const Navbar = () => {
       <Link to="/" style={{ color: '#60a5fa', textDecoration: 'none', fontWeight: 'bold', fontSize: '1.25rem', letterSpacing: '1px' }}>TICKETBOX</Link>
       <div>
         {role === 'ORGANIZER' && <Link to="/admin" style={{ marginRight: '20px', color: '#9ca3af', textDecoration: 'none' }}>Admin Dashboard</Link>}
+        
+        {/* Nút Hộp thư dành riêng cho Khán giả */}
+        {role === 'AUDIENCE' && (
+          <Link to="/notifications" style={{ marginRight: '20px', color: '#fcd34d', textDecoration: 'none', fontWeight: 'bold' }}>
+            🔔 Thông báo
+          </Link>
+        )}
+
         {role ? (
           <span style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
             <span style={{ background: '#374151', padding: '5px 12px', borderRadius: '20px', fontSize: '0.875rem' }}>Role: {role}</span>

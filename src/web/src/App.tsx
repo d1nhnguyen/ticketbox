@@ -8,6 +8,7 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import ConcertDetail from './pages/ConcertDetail';
 import Dashboard from './pages/admin/Dashboard';
+import Notifications from './pages/Notifications';
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/concert/:slug" element={<ConcertDetail />} />
             
+            <Route path="/notifications" element={<Notifications />} />
             {/* Tuyến đường được bảo vệ cho Admin */}
             <Route element={<ProtectedRoute allowedRoles={['ORGANIZER']} />}>
               <Route path="/admin" element={<Dashboard />} />
