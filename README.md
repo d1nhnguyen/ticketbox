@@ -151,7 +151,58 @@ docker compose run --rm -e FORCE_SEED=1 --entrypoint sh backend \
 
 ---
 
-## 8. Running the backend without Docker (optional)
+## 8. Load testing — oversell prevention
+
+The purchase flow guards against overselling under concurrency (atomic conditional
+decrement inside a row-locked transaction). [scripts/load-test/oversell.js](scripts/load-test/oversell.js)
+proves it: it fires **100 concurrent** purchase requests at the `anh-trai-say-hi`
+SVIP tier, which is seeded with only **50** tickets, and asserts that **exactly 50**
+succeed, 50 get `409 Sold Out`, and stock never goes negative.
+
+### Step 1 — reset the stock (required)
+
+The test only means something when SVIP stock starts at its full **50**. Re-seeding
+resets it, **but plain `npm run seed` is a no-op once the DB already has data** — the
+seed has an idempotency guard. You must force it with `FORCE_SEED=1`:
+
+```bash
+# Backend running in Docker:
+docker compose run --rm -e FORCE_SEED=1 --entrypoint sh backend \
+  -c "npx prisma migrate deploy && npx ts-node --transpile-only prisma/seed.ts"
+
+# Backend running on host (from src/backend):
+FORCE_SEED=1 npm run seed
+```
+
+```powershell
+# PowerShell (from src/backend):
+$env:FORCE_SEED="1"; npm run seed
+```
+
+> ⚠️ `FORCE_SEED=1` **wipes all orders/tickets** and re-creates the demo data.
+
+### Step 2 — run the test
+
+```bash
+node scripts/load-test/oversell.js
+```
+
+A genuine pass looks like this:
+
+```
+✅ Found SVIP ticket type: ... totalQty = 50, remainingQty = 50
+  ✅ 201 Created (Success) : 50
+  ⛔ 409 Conflict (Sold Out): 50
+  Remaining stock : 0
+🎉 OVERSELL PREVENTION TEST PASSED!
+```
+
+If you instead see it start from `remainingQty = 0` and pass with `0` sold, that's a
+**false pass** — the stock wasn't reset. Re-run Step 1 with `FORCE_SEED=1`.
+
+---
+
+## 9. Running the backend without Docker (optional)
 
 If you prefer to run the API on your host (you still need Postgres + Redis from Docker):
 
@@ -168,7 +219,7 @@ The host `.env` already points `DATABASE_URL` / `REDIS_URL` at `localhost`.
 
 ---
 
-## 9. Troubleshooting
+## 10. Troubleshooting
 
 | Symptom | Fix |
 | ------- | --- |
@@ -180,7 +231,7 @@ The host `.env` already points `DATABASE_URL` / `REDIS_URL` at `localhost`.
 
 ---
 
-## 10. Project layout
+## 11. Project layout
 
 ```
 ticketbox/

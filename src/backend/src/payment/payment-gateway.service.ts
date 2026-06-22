@@ -26,7 +26,7 @@ import {
 @Injectable()
 export class PaymentGatewayService implements OnModuleInit {
   private readonly logger = new Logger(PaymentGatewayService.name);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   private breaker: any;
   private gatewayUrl: string;
 
@@ -67,16 +67,22 @@ export class PaymentGatewayService implements OnModuleInit {
       ),
     );
     this.breaker.on('halfOpen', () =>
-      this.logger.log(`[CircuitBreaker] State → HALF-OPEN (testing recovery...)`),
+      this.logger.log(
+        `[CircuitBreaker] State → HALF-OPEN (testing recovery...)`,
+      ),
     );
     this.breaker.on('close', () =>
       this.logger.log(`[CircuitBreaker] State → CLOSED (gateway recovered ✓)`),
     );
     this.breaker.on('fallback', (result) =>
-      this.logger.warn(`[CircuitBreaker] Fallback triggered. Result: ${JSON.stringify(result)}`),
+      this.logger.warn(
+        `[CircuitBreaker] Fallback triggered. Result: ${JSON.stringify(result)}`,
+      ),
     );
     this.breaker.on('timeout', () =>
-      this.logger.warn(`[CircuitBreaker] Request timed out after ${timeoutMs}ms`),
+      this.logger.warn(
+        `[CircuitBreaker] Request timed out after ${timeoutMs}ms`,
+      ),
     );
     this.breaker.on('reject', () =>
       this.logger.warn(`[CircuitBreaker] Request rejected — circuit is OPEN`),
@@ -153,9 +159,7 @@ export class PaymentGatewayService implements OnModuleInit {
     if (!response.ok) {
       // Treat non-2xx as a failure so the breaker counts it
       const body = await response.text();
-      throw new Error(
-        `Gateway responded with ${response.status}: ${body}`,
-      );
+      throw new Error(`Gateway responded with ${response.status}: ${body}`);
     }
 
     return response.json() as Promise<PaymentResponse>;
