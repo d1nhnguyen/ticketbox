@@ -4,6 +4,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ConcertStatus, OrderStatus, TicketStatus } from '@prisma/client';
 import { ConcertsService } from './concerts.service';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { CacheService } from 'src/common/cache/cache.service';
 import { CONCERT_CANCELLED_EVENT } from './events/concert-cancelled.event';
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
@@ -33,6 +34,13 @@ const mockPrisma = {
 };
 
 const mockEventEmitter = { emit: jest.fn() };
+
+// getOrSet runs the loader so the existing prisma assertions still hold
+const mockCache = {
+  getOrSet: jest.fn((_key: string, _ttl: number, loader: () => any) => loader()),
+  invalidateConcert: jest.fn(),
+  invalidateAllConcerts: jest.fn(),
+};
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -64,6 +72,7 @@ describe('ConcertsService', () => {
         ConcertsService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: EventEmitter2, useValue: mockEventEmitter },
+        { provide: CacheService, useValue: mockCache },
       ],
     }).compile();
 

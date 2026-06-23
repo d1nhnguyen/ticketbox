@@ -165,7 +165,11 @@ export class PaymentGatewayService implements OnModuleInit {
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderId: req.orderId, amount: req.amount }),
+      body: JSON.stringify({
+        orderId: req.orderId,
+        amount: req.amount,
+        idempotencyKey: req.idempotencyKey,
+      }),
     });
 
     if (!response.ok) {

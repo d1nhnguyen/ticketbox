@@ -61,6 +61,8 @@ export class OrdersService implements OnModuleInit {
       throw new ConflictException('Duplicate request still processing');
     }
 
+    let order: Awaited<ReturnType<typeof this.prisma.order.create>>;
+    let concertSlug: string | undefined;
     try {
       const txResult = await this.prisma.$transaction(async (tx) => {
         // ---- lock the ticket type row → serializes all buyers of this type ----
@@ -133,15 +135,24 @@ export class OrdersService implements OnModuleInit {
         return { order: newOrder, concertSlug: concert?.slug };
       });
 
-      const { order, concertSlug } = txResult;
+      order = txResult.order;
+      concertSlug = txResult.concertSlug;
+    } catch (e) {
+      // genuine failure rolled back the whole TX → no order exists → free the key for a real retry
+      await this.redis.del(`idemp:${idempotencyKey}`);
+      throw e;
+    }
 
+    // ---- post-commit side effects ----
+    // The order is durably committed (DB @unique on idempotencyKey is the backstop), so a failure
+    // here must NOT delete the key or surface as an error — that would falsely report a real order
+    // as failed and block the retry.
+    try {
       if (concertSlug) {
-        console.log(`[OrdersService] Invalidating cache for slug: ${concertSlug}`);
         await this.cacheService.invalidateConcert(concertSlug);
       } else {
         console.warn(`[OrdersService] No concertSlug found to invalidate!`);
       }
-
       // store the result so a duplicate key returns the SAME order
       await this.redis.set(
         `idemp:${idempotencyKey}`,
@@ -149,12 +160,14 @@ export class OrdersService implements OnModuleInit {
         'EX',
         86400,
       );
-      return order;
-    } catch (e) {
-      // genuine failure rolled back the whole TX → no order exists → free the key for a real retry
-      await this.redis.del(`idemp:${idempotencyKey}`);
-      throw e;
+    } catch (postErr) {
+      console.error(
+        '[OrdersService] post-commit side effect failed (order is still created):',
+        postErr,
+      );
     }
+
+    return order;
   }
 
   async confirmPayment(orderId: string, userId: string) {
