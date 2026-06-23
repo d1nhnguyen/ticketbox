@@ -5,7 +5,9 @@ import {
   ConflictException,
   NotFoundException,
   ServiceUnavailableException,
+  OnModuleInit,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { REDIS_CLIENT } from 'src/common/redis/redis.module';
 import Redis from 'ioredis';
@@ -15,15 +17,27 @@ import { PaymentGatewayService } from 'src/payment/payment-gateway.service';
 import { PaymentResponse } from 'src/payment/payment.types';
 import { randomUUID } from 'crypto';
 import { CacheService } from 'src/common/cache/cache.service';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 
 @Injectable()
-export class OrdersService {
+export class OrdersService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     private readonly cacheService: CacheService,
     private readonly payment: PaymentGatewayService,
+    private readonly eventEmitter: EventEmitter2,
+    @InjectQueue('orders') private readonly ordersQueue: Queue,
   ) { }
+
+  async onModuleInit() {
+    await this.ordersQueue.add(
+      'release-expired',
+      {},
+      { repeat: { pattern: '* * * * *' } },
+    );
+  }
 
   async createOrder(userId: string, dto: PurchaseDto, idempotencyKey?: string) {
     if (!idempotencyKey) {
@@ -221,7 +235,7 @@ export class OrdersService {
       });
     });
 
-    // TODO: emit 'order.paid' → B invalidates cache + fires notifications (BullMQ)
+    this.eventEmitter.emit('order.paid', paid);
     return paid;
   }
 
@@ -282,5 +296,37 @@ export class OrdersService {
       include: { items: true, tickets: true },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async releaseExpiredOrders() {
+    const expiredOrders = await this.prisma.order.findMany({
+      where: {
+        status: OrderStatus.PENDING,
+        expiresAt: { lt: new Date() },
+      },
+      select: { id: true },
+    });
+
+    let releasedCount = 0;
+    for (const order of expiredOrders) {
+      await this.prisma.$transaction(async (tx) => {
+        const flip = await tx.order.updateMany({
+          where: { id: order.id, status: OrderStatus.PENDING },
+          data: { status: OrderStatus.EXPIRED },
+        });
+
+        if (flip.count === 1) {
+          const items = await tx.orderItem.findMany({ where: { orderId: order.id } });
+          for (const item of items) {
+            await tx.ticketType.update({
+              where: { id: item.ticketTypeId },
+              data: { remainingQty: { increment: item.quantity } },
+            });
+          }
+          releasedCount++;
+        }
+      });
+    }
+    return releasedCount;
   }
 }
