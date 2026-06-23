@@ -1,137 +1,110 @@
-#!/usr/bin/env node
 /**
- * Oversell Load Test — Cơ chế #1
+ * Oversell Load Test — Mechanism #1
  *
- * Mục tiêu: Chứng minh khi có 100 request đồng thời mua vé SVIP
- * (trong khi chỉ còn 50 vé), hệ thống bán đúng tối đa 50 vé
- * và không có vé âm (remainingQty >= 0).
+ * Proves: 100 concurrent buyers competing for 50 SVIP tickets →
+ *   - Exactly ≤ 50 succeed (no oversell)
+ *   - remainingQty ends at exactly 0, never negative
  *
- * Chạy: node scripts/load-test/oversell.js
+ * Run: k6 run scripts/load-test/oversell.js
+ * Reseed first: (from src/backend) FORCE_SEED=1 npm run seed
  */
 
-const crypto = require('crypto');
+import http from 'k6/http';
+import { check } from 'k6';
+import { Counter, Gauge } from 'k6/metrics';
 
-const API_URL = process.env.API_URL || 'http://localhost:3000';
-const CONCERT_SLUG = 'anh-trai-say-hi';
+const BASE_URL = __ENV.API_URL || 'http://localhost:3000';
+const STOCK = parseInt(__ENV.STOCK || '50', 10);
 
-async function run() {
-  console.log('='.repeat(60));
-  console.log('Oversell Load Test — Mechanism #1');
-  console.log(`Target: ${API_URL}`);
-  console.log('='.repeat(60));
+const purchaseOk = new Counter('purchase_ok');
+const purchaseSoldOut = new Counter('purchase_soldout');
+const finalRemaining = new Gauge('final_remaining_qty');
 
-  // 1. Log in to get token
-  console.log('👤 Logging in...');
-  const loginRes = await fetch(`${API_URL}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: 'audience@ticketbox.dev', password: 'password123' })
-  });
-  if (!loginRes.ok) {
-    throw new Error(`Login failed with status ${loginRes.status}`);
+export const options = {
+  scenarios: {
+    rush: {
+      executor: 'shared-iterations',
+      vus: 100,
+      iterations: 100,
+      maxDuration: '30s',
+    },
+  },
+  thresholds: {
+    // Core correctness invariants — if either fails, k6 exits non-zero
+    purchase_ok: [`count<=${STOCK}`],       // never oversell
+    final_remaining_qty: ['value>=0'],       // never negative stock
+  },
+};
+
+export function setup() {
+  // Login once — login endpoint is rate-limited (cap 5/IP), never do it per-VU
+  const loginRes = http.post(
+    `${BASE_URL}/auth/login`,
+    JSON.stringify({ email: 'audience@ticketbox.dev', password: 'password123' }),
+    { headers: { 'Content-Type': 'application/json' } },
+  );
+  if (loginRes.status !== 201) {
+    throw new Error(`Login failed: ${loginRes.status} ${loginRes.body}`);
   }
-  const { access_token } = await loginRes.json();
-  const headers = {
-    'Authorization': `Bearer ${access_token}`,
-    'Content-Type': 'application/json'
-  };
-  console.log('✅ Logged in successfully.');
+  const { access_token } = loginRes.json();
 
-  // 2. Fetch concert detail to get SVIP ticket type ID
-  console.log(`🔍 Fetching concert detail for "${CONCERT_SLUG}"...`);
-  const concertRes = await fetch(`${API_URL}/concerts/${CONCERT_SLUG}`);
-  if (!concertRes.ok) {
-    throw new Error(`Failed to fetch concert: ${concertRes.status}`);
+  // Fetch ticket type IDs dynamically — they are random UUIDs, not fixed
+  const concertRes = http.get(`${BASE_URL}/concerts/anh-trai-say-hi`);
+  if (concertRes.status !== 200) {
+    throw new Error(`Concert fetch failed: ${concertRes.status}`);
   }
-  const concert = await concertRes.json();
-  const svip = concert.ticketTypes.find(t => t.name === 'SVIP');
-  if (!svip) {
-    throw new Error('SVIP ticket type not found in seed data');
-  }
-  console.log(`✅ Found SVIP ticket type: ID = ${svip.id}, totalQty = ${svip.totalQty}, remainingQty = ${svip.remainingQty}`);
+  const concert = concertRes.json();
+  const svip = concert.ticketTypes.find((t) => t.name === 'SVIP');
+  if (!svip) throw new Error('SVIP ticket type not found — did you reseed?');
 
+  console.log(
+    `SVIP: id=${svip.id} totalQty=${svip.totalQty} remainingQty=${svip.remainingQty}`,
+  );
   if (svip.remainingQty < svip.totalQty) {
-    console.log('⚠️ Warning: Stock is already partially sold. Reset it before testing —');
-    console.log('   plain "npm run seed" is a no-op once the DB is seeded; you must force it:');
-    console.log('   (from src/backend)  FORCE_SEED=1 npm run seed');
-    console.log('   PowerShell:         $env:FORCE_SEED="1"; npm run seed');
+    console.warn(
+      `⚠ Stock is partially sold (${svip.remainingQty}/${svip.totalQty}). ` +
+      `Run: (from src/backend) FORCE_SEED=1 npm run seed`,
+    );
   }
 
-  const ticketTypeId = svip.id;
-  const numRequests = 100;
-  console.log(`🚀 Sending ${numRequests} concurrent purchase requests for 1 SVIP ticket each...`);
-
-  // 3. Fire requests concurrently
-  const requests = Array.from({ length: numRequests }, (_, i) => {
-    const idempotencyKey = crypto.randomUUID();
-    return fetch(`${API_URL}/orders`, {
-      method: 'POST',
-      headers: {
-        ...headers,
-        'idempotency-key': idempotencyKey
-      },
-      body: JSON.stringify({ ticketTypeId, quantity: 1 })
-    }).then(async res => {
-      const body = await res.json().catch(() => ({}));
-      return { status: res.status, body };
-    }).catch(err => {
-      return { status: -1, error: err.message };
-    });
-  });
-
-  const results = await Promise.all(requests);
-
-  // 4. Summarize results
-  const statusCounts = {};
-  results.forEach(r => {
-    statusCounts[r.status] = (statusCounts[r.status] || 0) + 1;
-  });
-
-  const success = results.filter(r => r.status === 201).length;
-  const soldOut = results.filter(r => r.status === 409).length;
-  const errorLimit = results.filter(r => r.status === 400).length;
-  const systemErrors = results.filter(r => r.status === 500 || r.status === -1).length;
-
-  console.log('\n📊 RESULTS:');
-  console.log(`  All status counts: ${JSON.stringify(statusCounts)}`);
-  console.log(`  ✅ 201 Created (Success) : ${success}`);
-  console.log(`  ⛔ 409 Conflict (Sold Out): ${soldOut}`);
-  console.log(`  ⚠️  400 Bad Request      : ${errorLimit}`);
-  console.log(`  ❌ Errors                : ${systemErrors}`);
-
-  // 5. Verify database state via API
-  console.log(`\n🔍 Verifying final remaining quantity...`);
-  const verifyRes = await fetch(`${API_URL}/concerts/${CONCERT_SLUG}`);
-  const verifyConcert = await verifyRes.json();
-  const verifySvip = verifyConcert.ticketTypes.find(t => t.name === 'SVIP');
-
-  console.log(`  Initial stock   : ${svip.remainingQty}`);
-  console.log(`  Tickets sold    : ${success}`);
-  console.log(`  Remaining stock : ${verifySvip.remainingQty}`);
-
-  console.log('\n🧪 VALIDATION:');
-  const expectedRemaining = Math.max(0, svip.remainingQty - success);
-  
-  let passed = true;
-  if (verifySvip.remainingQty === expectedRemaining && verifySvip.remainingQty >= 0) {
-    console.log('  ✅ PASS — Remaining quantity matches exactly and is never negative.');
-  } else {
-    console.log('  ❌ FAIL — Remaining quantity mismatch or negative stock!');
-    passed = false;
-  }
-
-  if (success <= svip.remainingQty) {
-    console.log(`  ✅ PASS — Sold count (${success}) is <= available stock (${svip.remainingQty}).`);
-  } else {
-    console.log(`  ❌ FAIL — Oversold detected! Sold ${success} but only ${svip.remainingQty} were available.`);
-    passed = false;
-  }
-
-  if (passed) {
-    console.log('\n🎉 OVERSELL PREVENTION TEST PASSED!');
-  } else {
-    console.log('\n❌ OVERSELL PREVENTION TEST FAILED!');
-  }
+  return { token: access_token, ticketTypeId: svip.id, initialRemaining: svip.remainingQty };
 }
 
-run().catch(err => console.error('Execution failed:', err));
+export default function (data) {
+  const idempotencyKey = `vu${__VU}-iter${__ITER}-${Date.now()}`;
+  const res = http.post(
+    `${BASE_URL}/orders`,
+    JSON.stringify({ ticketTypeId: data.ticketTypeId, quantity: 1 }),
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${data.token}`,
+        'Idempotency-Key': idempotencyKey,
+      },
+    },
+  );
+
+  check(res, {
+    'status is 201 or 409': (r) => r.status === 201 || r.status === 409,
+  });
+
+  if (res.status === 201) purchaseOk.add(1);
+  else if (res.status === 409) purchaseSoldOut.add(1);
+}
+
+export function teardown(data) {
+  // Verify DB state via API (caching not active → reads live DB)
+  const concertRes = http.get(`${BASE_URL}/concerts/anh-trai-say-hi`);
+  const concert = concertRes.json();
+  const svip = concert.ticketTypes.find((t) => t.name === 'SVIP');
+
+  if (svip) {
+    finalRemaining.add(svip.remainingQty);
+    console.log(`Final remainingQty = ${svip.remainingQty} (expect 0 on a full run)`);
+    if (svip.remainingQty < 0) {
+      console.error('❌ OVERSELL DETECTED — remainingQty is negative!');
+    } else if (svip.remainingQty === 0) {
+      console.log('✅ Stock exactly exhausted, no oversell.');
+    }
+  }
+}

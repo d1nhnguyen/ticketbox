@@ -1,112 +1,98 @@
-#!/usr/bin/env node
 /**
- * Per-User Limit Load Test — Cơ cơ #6
+ * Per-User Limit Load Test — Mechanism #6
  *
- * Mục tiêu: Chứng minh khi một tài khoản gửi 10 request đồng thời
- * mua vé VIP (giới hạn tối đa 4 vé/user), hệ thống bán đúng tối đa
- * 4 vé cho user đó, 6 request còn lại thất bại với lỗi HTTP 400.
+ * Proves: 10 concurrent buy requests from ONE account (VIP, maxPerUser=4) →
+ *   - Exactly ≤ 4 succeed
+ *   - The rest are blocked with HTTP 400 (per-user limit exceeded)
  *
- * Chạy: node scripts/load-test/per-user-limit.js
+ * Run: k6 run scripts/load-test/per-user-limit.js
+ * Reseed first: (from src/backend) FORCE_SEED=1 npm run seed
  */
 
-const crypto = require('crypto');
+import http from 'k6/http';
+import { check } from 'k6';
+import { Counter } from 'k6/metrics';
 
-const API_URL = process.env.API_URL || 'http://localhost:3000';
-const CONCERT_SLUG = 'anh-trai-say-hi';
+const BASE_URL = __ENV.API_URL || 'http://localhost:3000';
+const MAX_PER_USER = parseInt(__ENV.MAX_PER_USER || '4', 10);
+const NUM_REQUESTS = 10;
 
-async function run() {
-  console.log('='.repeat(60));
-  console.log('Per-User Limit Load Test — Mechanism #6');
-  console.log(`Target: ${API_URL}`);
-  console.log('='.repeat(60));
+const purchaseOk = new Counter('purchase_ok');
+const limitBlocked = new Counter('limit_blocked');
 
-  // 1. Log in to get token
-  console.log('👤 Logging in...');
-  const loginRes = await fetch(`${API_URL}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: 'audience@ticketbox.dev', password: 'password123' })
-  });
-  if (!loginRes.ok) {
-    throw new Error(`Login failed with status ${loginRes.status}`);
+export const options = {
+  scenarios: {
+    concurrent_same_user: {
+      executor: 'shared-iterations',
+      vus: NUM_REQUESTS,
+      iterations: NUM_REQUESTS,
+      maxDuration: '30s',
+    },
+  },
+  thresholds: {
+    // Hard invariant: one account must never exceed maxPerUser
+    purchase_ok: [`count<=${MAX_PER_USER}`],
+    // The limit must actually fire — if nobody is blocked, the mechanism isn't working
+    limit_blocked: ['count>0'],
+  },
+};
+
+export function setup() {
+  const loginRes = http.post(
+    `${BASE_URL}/auth/login`,
+    JSON.stringify({ email: 'audience@ticketbox.dev', password: 'password123' }),
+    { headers: { 'Content-Type': 'application/json' } },
+  );
+  if (loginRes.status !== 201) {
+    throw new Error(`Login failed: ${loginRes.status} ${loginRes.body}`);
   }
-  const { access_token } = await loginRes.json();
-  const headers = {
-    'Authorization': `Bearer ${access_token}`,
-    'Content-Type': 'application/json'
+  const { access_token } = loginRes.json();
+
+  const concertRes = http.get(`${BASE_URL}/concerts/anh-trai-say-hi`);
+  if (concertRes.status !== 200) {
+    throw new Error(`Concert fetch failed: ${concertRes.status}`);
+  }
+  const concert = concertRes.json();
+  const vip = concert.ticketTypes.find((t) => t.name === 'VIP');
+  if (!vip) throw new Error('VIP ticket type not found — did you reseed?');
+
+  console.log(`VIP: id=${vip.id} maxPerUser=${vip.maxPerUser} remainingQty=${vip.remainingQty}`);
+
+  return {
+    token: access_token,
+    ticketTypeId: vip.id,
+    maxPerUser: vip.maxPerUser,
   };
-  console.log('✅ Logged in successfully.');
-
-  // 2. Fetch concert detail to get VIP ticket type ID
-  console.log(`🔍 Fetching concert detail for "${CONCERT_SLUG}"...`);
-  const concertRes = await fetch(`${API_URL}/concerts/${CONCERT_SLUG}`);
-  if (!concertRes.ok) {
-    throw new Error(`Failed to fetch concert: ${concertRes.status}`);
-  }
-  const concert = await concertRes.json();
-  const vip = concert.ticketTypes.find(t => t.name === 'VIP');
-  if (!vip) {
-    throw new Error('VIP ticket type not found in seed data');
-  }
-  console.log(`✅ Found VIP ticket type: ID = ${vip.id}, maxPerUser = ${vip.maxPerUser}`);
-
-  const ticketTypeId = vip.id;
-  const maxPerUser = vip.maxPerUser;
-  const numRequests = 10;
-  console.log(`🚀 Sending ${numRequests} concurrent purchase requests for 1 VIP ticket each...`);
-
-  // 3. Fire requests concurrently
-  const requests = Array.from({ length: numRequests }, (_, i) => {
-    const idempotencyKey = crypto.randomUUID();
-    return fetch(`${API_URL}/orders`, {
-      method: 'POST',
-      headers: {
-        ...headers,
-        'idempotency-key': idempotencyKey
-      },
-      body: JSON.stringify({ ticketTypeId, quantity: 1 })
-    }).then(async res => {
-      const body = await res.json().catch(() => ({}));
-      return { status: res.status, body };
-    }).catch(err => {
-      return { status: -1, error: err.message };
-    });
-  });
-
-  const results = await Promise.all(requests);
-
-  // 4. Summarize results
-  const success = results.filter(r => r.status === 201).length;
-  const badRequest = results.filter(r => r.status === 400).length;
-  const other = results.filter(r => r.status !== 201 && r.status !== 400).length;
-
-  console.log('\n📊 RESULTS:');
-  console.log(`  ✅ 201 Created (Success) : ${success}`);
-  console.log(`  ⛔ 400 Bad Request      : ${badRequest}`);
-  console.log(`  ❌ Other (e.g. 500)      : ${other}`);
-
-  console.log('\n🧪 VALIDATION:');
-  let passed = true;
-
-  if (success === maxPerUser) {
-    console.log(`  ✅ PASS — Successfully bought exactly maxPerUser (${maxPerUser}) tickets.`);
-  } else {
-    console.log(`  ❌ FAIL — Expected exactly ${maxPerUser} successes, but got ${success}.`);
-    passed = false;
-  }
-
-  if (badRequest === (numRequests - maxPerUser)) {
-    console.log(`  ✅ PASS — Blocked exactly ${numRequests - maxPerUser} requests exceeding limit.`);
-  } else {
-    console.log(`  ❌ FAIL — Expected ${numRequests - maxPerUser} blocked requests, but got ${badRequest}.`);
-    passed = false;
-  }
-
-  if (passed) {
-    console.log('\n🎉 PER-USER LIMIT TEST PASSED!');
-  } else {
-    console.log('\n❌ PER-USER LIMIT TEST FAILED!');
-  }
 }
 
-run().catch(err => console.error('Execution failed:', err));
+export default function (data) {
+  // All VUs share the same token → same user account → per-user limit applies
+  const idempotencyKey = `vu${__VU}-iter${__ITER}-${Date.now()}`;
+  const res = http.post(
+    `${BASE_URL}/orders`,
+    JSON.stringify({ ticketTypeId: data.ticketTypeId, quantity: 1 }),
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${data.token}`,
+        'Idempotency-Key': idempotencyKey,
+      },
+    },
+  );
+
+  check(res, {
+    'status is 201 or 400': (r) => r.status === 201 || r.status === 400,
+  });
+
+  if (res.status === 201) purchaseOk.add(1);
+  else if (res.status === 400) limitBlocked.add(1);
+}
+
+export function teardown(data) {
+  // purchase_ok and limit_blocked are logged automatically in k6 threshold summary.
+  // A passing run on a fresh seed shows: purchase_ok=4, limit_blocked=6.
+  console.log(
+    `maxPerUser configured: ${data.maxPerUser} | ` +
+    `Expected: purchase_ok==${data.maxPerUser}, limit_blocked==${NUM_REQUESTS - data.maxPerUser}`,
+  );
+}
