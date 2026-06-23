@@ -23,14 +23,24 @@ export const SKIP_RATE_LIMIT_KEY = 'skipRateLimit';
 export const RATE_LIMIT_CONFIG_KEY = 'rateLimitConfig';
 
 export interface RateLimitOptions {
-  /** Max tokens (burst capacity). Default from config: RATE_LIMIT_CAPACITY */
+  /** Max tokens (burst capacity) */
   capacity?: number;
-  /** Tokens refilled per second. Default from config: RATE_LIMIT_REFILL_RATE */
+  /** Tokens refilled per second. */
   refillRate?: number;
   /** Tokens consumed per request. Default: 1 */
   cost?: number;
   /** Key strategy: 'ip' | 'user' | 'ip+user'. Default: 'ip' */
   keyStrategy?: 'ip' | 'user' | 'ip+user';
+  /**
+   * Example: paymentCapacity: 'PAYMENT_RATE_LIMIT_CAPACITY'
+   * Ignored if `capacity` is also set.
+   */
+  paymentCapacity?: string;
+  /**
+   * Example: paymentRefillRate: 'PAYMENT_RATE_LIMIT_REFILL_RATE'
+   * Ignored if `refillRate` is also set.
+   */
+  paymentRefillRate?: string;
 }
 
 /**
@@ -80,8 +90,20 @@ export class RateLimitGuard implements CanActivate {
       [context.getHandler(), context.getClass()],
     );
 
-    const capacity = options?.capacity ?? this.defaultCapacity;
-    const refillRate = options?.refillRate ?? this.defaultRefillRate;
+    // Resolve capacity: hardcoded > env var > global default
+    const capacity =
+      options?.capacity ??
+      (options?.paymentCapacity
+        ? parseInt(this.configService.get<string>(options.paymentCapacity, String(this.defaultCapacity)), 10)
+        : this.defaultCapacity);
+
+    // Resolve refillRate: hardcoded > env var > global default
+    const refillRate =
+      options?.refillRate ??
+      (options?.paymentRefillRate
+        ? parseFloat(this.configService.get<string>(options.paymentRefillRate, String(this.defaultRefillRate)))
+        : this.defaultRefillRate);
+
     const cost = options?.cost ?? 1;
     const keyStrategy = options?.keyStrategy ?? 'ip';
 

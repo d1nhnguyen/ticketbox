@@ -5,23 +5,39 @@ import {
   ConflictException,
   NotFoundException,
   ServiceUnavailableException,
+  OnModuleInit,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { REDIS_CLIENT } from 'src/common/redis/redis.module';
 import Redis from 'ioredis';
 import { TicketType, OrderStatus } from '@prisma/client';
 import { PurchaseDto } from './dto/purchase.dto';
 import { PaymentGatewayService } from 'src/payment/payment-gateway.service';
-import { PaymentResult } from 'src/payment/payment.types';
+import { PaymentResponse } from 'src/payment/payment.types';
 import { randomUUID } from 'crypto';
+import { CacheService } from 'src/common/cache/cache.service';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 
 @Injectable()
-export class OrdersService {
+export class OrdersService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
+    private readonly cacheService: CacheService,
     private readonly payment: PaymentGatewayService,
-  ) {}
+    private readonly eventEmitter: EventEmitter2,
+    @InjectQueue('orders') private readonly ordersQueue: Queue,
+  ) { }
+
+  async onModuleInit() {
+    await this.ordersQueue.add(
+      'release-expired',
+      {},
+      { repeat: { pattern: '* * * * *' } },
+    );
+  }
 
   async createOrder(userId: string, dto: PurchaseDto, idempotencyKey?: string) {
     if (!idempotencyKey) {
@@ -46,7 +62,7 @@ export class OrdersService {
     }
 
     try {
-      const order = await this.prisma.$transaction(async (tx) => {
+      const txResult = await this.prisma.$transaction(async (tx) => {
         // ---- lock the ticket type row → serializes all buyers of this type ----
         const rows = await tx.$queryRaw<TicketType[]>`
           SELECT * FROM "TicketType" WHERE id = ${dto.ticketTypeId} FOR UPDATE
@@ -55,6 +71,11 @@ export class OrdersService {
         if (!tt) {
           throw new NotFoundException('Ticket type not found');
         }
+
+        const concert = await tx.concert.findUnique({
+          where: { id: tt.concertId },
+          select: { slug: true }
+        });
 
         // ---- sale window ----
         if (new Date() < new Date(tt.saleStartsAt)) {
@@ -88,7 +109,7 @@ export class OrdersService {
         }
 
         // ---- create PENDING order (10-min hold) ----
-        return tx.order.create({
+        const newOrder = await tx.order.create({
           data: {
             userId,
             concertId: tt.concertId,
@@ -108,7 +129,18 @@ export class OrdersService {
           },
           include: { items: true },
         });
+
+        return { order: newOrder, concertSlug: concert?.slug };
       });
+
+      const { order, concertSlug } = txResult;
+
+      if (concertSlug) {
+        console.log(`[OrdersService] Invalidating cache for slug: ${concertSlug}`);
+        await this.cacheService.invalidateConcert(concertSlug);
+      } else {
+        console.warn(`[OrdersService] No concertSlug found to invalidate!`);
+      }
 
       // store the result so a duplicate key returns the SAME order
       await this.redis.set(
@@ -147,29 +179,24 @@ export class OrdersService {
 
     // ---- charge through B's circuit-breaker-wrapped gateway ----
     // forward the order's idempotencyKey so a real provider dedups a concurrent double-charge.
-    let result: PaymentResult;
+    let result: PaymentResponse;
     try {
       result = await this.payment.charge({
         orderId,
         amount: order.totalAmount,
         idempotencyKey: order.idempotencyKey ?? undefined,
       });
-    } catch {
-      // a thrown/rejected charge (gateway 500 before the breaker trips) = a hard payment failure
-      result = {
-        status: 'failed',
-        txnId: '',
-        orderId,
-        amount: order.totalAmount,
-      };
+    } catch (e) {
+      // Circuit OPEN → ServiceUnavailableException thrown by fallback; re-throw as-is
+      // so the order stays PENDING and the user can retry.
+      if (e instanceof ServiceUnavailableException) throw e;
+      // Any other gateway error = hard payment failure → release reservation.
+      await this.releaseOrder(orderId);
+      throw new BadRequestException('Payment failed');
     }
 
-    if (result.status === 'unavailable') {
-      // circuit OPEN → fail fast, leave the order PENDING so the user can retry.
-      throw new ServiceUnavailableException(result.message);
-    }
     if (result.status === 'failed') {
-      // hard failure → release the reservation, then surface the error.
+      // Hard failure returned by the gateway → release the reservation.
       await this.releaseOrder(orderId);
       throw new BadRequestException('Payment failed');
     }
@@ -208,7 +235,7 @@ export class OrdersService {
       });
     });
 
-    // TODO: emit 'order.paid' → B invalidates cache + fires notifications (BullMQ)
+    this.eventEmitter.emit('order.paid', paid);
     return paid;
   }
 
@@ -269,5 +296,37 @@ export class OrdersService {
       include: { items: true, tickets: true },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async releaseExpiredOrders() {
+    const expiredOrders = await this.prisma.order.findMany({
+      where: {
+        status: OrderStatus.PENDING,
+        expiresAt: { lt: new Date() },
+      },
+      select: { id: true },
+    });
+
+    let releasedCount = 0;
+    for (const order of expiredOrders) {
+      await this.prisma.$transaction(async (tx) => {
+        const flip = await tx.order.updateMany({
+          where: { id: order.id, status: OrderStatus.PENDING },
+          data: { status: OrderStatus.EXPIRED },
+        });
+
+        if (flip.count === 1) {
+          const items = await tx.orderItem.findMany({ where: { orderId: order.id } });
+          for (const item of items) {
+            await tx.ticketType.update({
+              where: { id: item.ticketTypeId },
+              data: { remainingQty: { increment: item.quantity } },
+            });
+          }
+          releasedCount++;
+        }
+      });
+    }
+    return releasedCount;
   }
 }
