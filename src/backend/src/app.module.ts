@@ -11,6 +11,7 @@ import { OrdersModule } from './orders/orders.module';
 import { TicketTypesModule } from './ticket-types/ticket-types.module';
 import { BullModule } from '@nestjs/bullmq';
 import { NotificationsModule } from './notifications/notifications.module';
+import { GuestsModule } from './guests/guests.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     OrdersModule,
     TicketTypesModule,
     NotificationsModule,
+    GuestsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
