@@ -78,10 +78,10 @@ export class RateLimitGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     // Check @SkipRateLimit() decorator
-    const skip = this.reflector.getAllAndOverride<boolean>(SKIP_RATE_LIMIT_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const skip = this.reflector.getAllAndOverride<boolean>(
+      SKIP_RATE_LIMIT_KEY,
+      [context.getHandler(), context.getClass()],
+    );
     if (skip) return true;
 
     // Check per-route override
@@ -113,7 +113,12 @@ export class RateLimitGuard implements CanActivate {
     const bucketKey = this.buildKey(req, keyStrategy);
 
     const { allowed, remaining, retryAfterMs } =
-      await this.rateLimitService.consume(bucketKey, capacity, refillRate, cost);
+      await this.rateLimitService.consume(
+        bucketKey,
+        capacity,
+        refillRate,
+        cost,
+      );
 
     // Set standard rate limit headers (RateLimit-* draft RFC)
     res.setHeader('X-RateLimit-Limit', capacity);
@@ -158,7 +163,11 @@ export class RateLimitGuard implements CanActivate {
 
   private buildKey(req: Request, strategy: string): string {
     const ip = this.getClientIp(req);
-    const userId = (req as any).user?.userId ?? (req as any).user?.sub ?? (req as any).user?.id ?? this.getUserIdFromHeader(req);
+    const userId =
+      (req as any).user?.userId ??
+      (req as any).user?.sub ??
+      (req as any).user?.id ??
+      this.getUserIdFromHeader(req);
 
     switch (strategy) {
       case 'user':

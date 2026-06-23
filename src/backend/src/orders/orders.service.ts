@@ -4,12 +4,15 @@ import {
   BadRequestException,
   ConflictException,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { REDIS_CLIENT } from 'src/common/redis/redis.module';
 import Redis from 'ioredis';
 import { TicketType, OrderStatus } from '@prisma/client';
 import { PurchaseDto } from './dto/purchase.dto';
+import { PaymentGatewayService } from 'src/payment/payment-gateway.service';
+import { PaymentResponse } from 'src/payment/payment.types';
 import { randomUUID } from 'crypto';
 import { CacheService } from 'src/common/cache/cache.service';
 
@@ -19,7 +22,8 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     private readonly cacheService: CacheService,
-  ) {}
+    private readonly payment: PaymentGatewayService,
+  ) { }
 
   async createOrder(userId: string, dto: PurchaseDto, idempotencyKey?: string) {
     if (!idempotencyKey) {
@@ -139,9 +143,53 @@ export class OrdersService {
     }
   }
 
-  async confirmPayment(orderId: string) {
-    return this.prisma.$transaction(async (tx) => {
-      // conditional flip = idempotency guard: a duplicate callback flips 0 rows and skips re-issuing
+  async confirmPayment(orderId: string, userId: string) {
+    // ---- pre-check (BEFORE charging) — also our double-charge guard ----
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: true, tickets: true },
+    });
+    if (!order) {
+      throw new NotFoundException(`Order with ID ${orderId} not found`);
+    }
+    if (order.userId !== userId) {
+      throw new BadRequestException('Access denied to this order');
+    }
+    // already paid → idempotent: return the same result, do NOT charge again
+    if (order.status === OrderStatus.PAID) {
+      return order;
+    }
+    if (order.status !== OrderStatus.PENDING) {
+      throw new BadRequestException(`Order is ${order.status}, cannot confirm`);
+    }
+
+    // ---- charge through B's circuit-breaker-wrapped gateway ----
+    // forward the order's idempotencyKey so a real provider dedups a concurrent double-charge.
+    let result: PaymentResponse;
+    try {
+      result = await this.payment.charge({
+        orderId,
+        amount: order.totalAmount,
+        idempotencyKey: order.idempotencyKey ?? undefined,
+      });
+    } catch (e) {
+      // Circuit OPEN → ServiceUnavailableException thrown by fallback; re-throw as-is
+      // so the order stays PENDING and the user can retry.
+      if (e instanceof ServiceUnavailableException) throw e;
+      // Any other gateway error = hard payment failure → release reservation.
+      await this.releaseOrder(orderId);
+      throw new BadRequestException('Payment failed');
+    }
+
+    if (result.status === 'failed') {
+      // Hard failure returned by the gateway → release the reservation.
+      await this.releaseOrder(orderId);
+      throw new BadRequestException('Payment failed');
+    }
+
+    // ---- success → issue tickets (idempotent via conditional flip) ----
+    const paid = await this.prisma.$transaction(async (tx) => {
+      // conditional flip = idempotency guard: a duplicate/concurrent confirm flips 0 rows and skips re-issuing
       const flip = await tx.order.updateMany({
         where: { id: orderId, status: OrderStatus.PENDING },
         data: { status: OrderStatus.PAID },
@@ -172,31 +220,36 @@ export class OrdersService {
         include: { tickets: true, items: true },
       });
     });
+
+    // TODO: emit 'order.paid' → B invalidates cache + fires notifications (BullMQ)
+    return paid;
   }
 
   async failPayment(orderId: string) {
+    return this.releaseOrder(orderId);
+  }
+
+  /**
+   * Flip a PENDING order to FAILED and return its reserved stock — exactly once.
+   * The guarded `updateMany` is the idempotency latch: only the caller that flips
+   * the row (count === 1) releases stock; a duplicate/lost race flips 0 rows and
+   * skips the release, so `remainingQty` is incremented exactly once.
+   */
+  private async releaseOrder(orderId: string) {
     return this.prisma.$transaction(async (tx) => {
-      const order = await tx.order.findUnique({
-        where: { id: orderId },
-        include: { items: true },
-      });
-
-      if (!order || order.status !== OrderStatus.PENDING) {
-        return order;
-      }
-
-      // flip status
-      await tx.order.update({
-        where: { id: orderId },
+      const flip = await tx.order.updateMany({
+        where: { id: orderId, status: OrderStatus.PENDING },
         data: { status: OrderStatus.FAILED },
       });
 
-      // release stock
-      for (const item of order.items) {
-        await tx.ticketType.update({
-          where: { id: item.ticketTypeId },
-          data: { remainingQty: { increment: item.quantity } },
-        });
+      if (flip.count === 1) {
+        const items = await tx.orderItem.findMany({ where: { orderId } });
+        for (const item of items) {
+          await tx.ticketType.update({
+            where: { id: item.ticketTypeId },
+            data: { remainingQty: { increment: item.quantity } },
+          });
+        }
       }
 
       return tx.order.findUnique({

@@ -39,14 +39,15 @@ export class OrdersController {
 
   @Post(':id/confirm')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.AUDIENCE, Role.ORGANIZER)
-  async confirm(@Param('id') id: string) {
-    return this.ordersService.confirmPayment(id);
+  @Roles(Role.AUDIENCE)
+  async confirm(@Req() req: any, @Param('id') id: string) {
+    const userId = req.user.userId;
+    return this.ordersService.confirmPayment(id, userId);
   }
 
   @Post(':id/fail')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.AUDIENCE, Role.ORGANIZER)
+  @Roles(Role.AUDIENCE)
   async fail(@Param('id') id: string) {
     return this.ordersService.failPayment(id);
   }
