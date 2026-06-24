@@ -76,17 +76,20 @@ DAY 21  upload to public Drive; create submission .txt; walk the §7 matrix; sub
 
 Your week, in order: **check-in/sync API → server double-scan rejection → guest-verify endpoint → verify the 2-device scenario with C.**
 
-## A1. Settle the double check-in constraint (Day 13, with C)
+## A1. Double check-in constraint — ✅ DONE (Option A settled)
 
-Pick **Option A or B** from the Week 1 guide and write it into `specs/checkin.md`. Recommended: **Option A** (unique on the `Ticket` flip to `USED`) — the `CheckinLog` stays an append-only audit of every scan attempt (including rejected duplicates, which you need for the 2-device demo).
+**Decision: Option A** — the active guard is the atomic conditional `VALID → USED` flip in the sync transaction; `CheckinLog` is append-only with no unique on `ticketId` so every scan attempt (including rejected duplicates) is logged for audit.
 
-```sql
--- raw migration
-CREATE UNIQUE INDEX one_checkin_per_ticket
-  ON "Ticket" (id) WHERE status = 'USED';
-```
+**Already implemented:**
+- Migration `20260624000000_add_double_checkin_constraint` adds the partial unique index as a DB-level backstop:
+  ```sql
+  CREATE UNIQUE INDEX "one_checkin_per_ticket"
+    ON "Ticket" ("id") WHERE status = 'USED';
+  ```
+- `schema.prisma` comments updated to reflect Option A.
+- `blueprint/specs/checkin.md` written with the full decision rationale, flow diagrams, error scenarios, and acceptance criteria.
 
-> Do **not** use a plain `@@unique([ticketId])` on `CheckinLog` — it blocks logging rejected duplicate scans, which is exactly the audit trail the demo needs.
+Move directly to **A2** (sync endpoint) — A1 is a completed prerequisite.
 
 ## A2. Sync endpoint (batch, idempotent per scan)
 
