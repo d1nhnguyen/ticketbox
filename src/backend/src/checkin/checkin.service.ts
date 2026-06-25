@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { SyncStatus, TicketStatus } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ScanDto, SyncResult } from './dto/sync.dto';
@@ -51,5 +51,27 @@ export class CheckinService {
     }
 
     return results;
+  }
+
+  async getValidTickets(concertId: string) {
+    await this.ensureConcert(concertId);
+    const tickets = await this.prisma.ticket.findMany({
+      where: { status: TicketStatus.VALID, ticketType: { concertId } },
+      select: { id: true, qrCode: true },
+    });
+    return tickets.map((t) => ({ ticketId: t.id, qrCode: t.qrCode }));
+  }
+
+  async getGuests(concertId: string) {
+    await this.ensureConcert(concertId);
+    return this.prisma.guestListEntry.findMany({
+      where: { concertId },
+      select: { id: true, fullName: true, docId: true, zone: true, status: true },
+    });
+  }
+
+  private async ensureConcert(concertId: string) {
+    const concert = await this.prisma.concert.findUnique({ where: { id: concertId } });
+    if (!concert) throw new NotFoundException(`Concert ${concertId} not found`);
   }
 }
