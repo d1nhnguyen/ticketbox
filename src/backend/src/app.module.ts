@@ -13,6 +13,7 @@ import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { BullModule } from '@nestjs/bullmq';
 import { NotificationsModule } from './notifications/notifications.module';
 import { GuestsModule } from './guests/guests.module';
+import { CheckinModule } from './checkin/checkin.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { GuestsModule } from './guests/guests.module';
     TicketTypesModule,
     NotificationsModule,
     GuestsModule,
+    CheckinModule,
   ],
   controllers: [AppController],
   providers: [AppService],
