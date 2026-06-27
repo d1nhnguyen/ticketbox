@@ -129,7 +129,18 @@ export class ConcertsService {
         venue: true,
         startsAt: true,
         status: true,
+        artistBio: true,
         createdAt: true,
+        ticketTypes: {
+          select: {
+            id: true,
+            name: true,
+            price: true,
+            totalQty: true,
+            remainingQty: true,
+          },
+          orderBy: { price: 'desc' },
+        },
       },
       orderBy: { startsAt: 'asc' },
     });
@@ -150,7 +161,7 @@ export class ConcertsService {
 
   async create(dto: CreateConcertDto) {
     try {
-      return await this.prisma.concert.create({
+      const concert = await this.prisma.concert.create({
         data: {
           title: dto.title,
           slug: dto.slug,
@@ -162,6 +173,9 @@ export class ConcertsService {
           seatMapSvg: dto.seatMapSvg,
         },
       });
+      // Invalidate list cache so audience sees the new concert immediately
+      await this.invalidateAllCache();
+      return concert;
     } catch (e: any) {
       if (e?.code === 'P2002') {
         throw new ConflictException(`Slug "${dto.slug}" is already taken`);
@@ -171,9 +185,9 @@ export class ConcertsService {
   }
 
   async update(id: string, dto: UpdateConcertDto) {
-    await this.adminFindById(id); // 404 guard
+    const existing = await this.adminFindById(id); // 404 guard
     try {
-      return await this.prisma.concert.update({
+      const updated = await this.prisma.concert.update({
         where: { id },
         data: {
           ...(dto.title !== undefined && { title: dto.title }),
@@ -186,6 +200,12 @@ export class ConcertsService {
           ...(dto.seatMapSvg !== undefined && { seatMapSvg: dto.seatMapSvg }),
         },
       });
+      // Invalidate both detail (old slug) and list cache
+      await this.invalidateCache(existing.slug);
+      if (dto.slug && dto.slug !== existing.slug) {
+        await this.invalidateCache(dto.slug);
+      }
+      return updated;
     } catch (e: any) {
       if (e?.code === 'P2002') {
         throw new ConflictException(`Slug "${dto.slug}" is already taken`);
@@ -208,6 +228,8 @@ export class ConcertsService {
       );
     }
     await this.prisma.concert.delete({ where: { id } });
+    // Invalidate cache so the deleted concert disappears from audience view
+    await this.invalidateCache(concert.slug);
     return { deleted: true };
   }
 
@@ -274,6 +296,9 @@ export class ConcertsService {
       CONCERT_CANCELLED_EVENT,
       new ConcertCancelledEvent(id, concert.title, buyerUserIds),
     );
+
+    // Invalidate cache so audience sees CANCELLED status immediately
+    await this.invalidateCache(concert.slug);
 
     return this.adminFindById(id);
   }

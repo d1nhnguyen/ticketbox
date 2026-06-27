@@ -116,7 +116,35 @@ export default function ConcertDetail() {
       
       <div style={{ marginTop: '30px', background: 'white', padding: '30px', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
         <h1 style={{ fontSize: '2.5rem', marginBottom: '10px' }}>{concert.title}</h1>
-        <p style={{ fontSize: '1.1rem', color: '#4b5563', marginBottom: '30px' }}>📍 {concert.venue} &nbsp;|&nbsp; ⏰ {new Date(concert.startsAt).toLocaleString('vi-VN')}</p>
+        <p style={{ fontSize: '1.1rem', color: '#4b5563', marginBottom: '20px' }}>📍 {concert.venue} &nbsp;|&nbsp; ⏰ {new Date(concert.startsAt).toLocaleString('vi-VN')}</p>
+
+        {/* ===== AI Artist Bio ===== */}
+        {concert.artistBio && (
+          <div style={{
+            background: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
+            border: '1px solid #c4b5fd',
+            borderLeft: '4px solid #7c3aed',
+            borderRadius: '12px',
+            padding: '20px 24px',
+            marginBottom: '28px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+              <span style={{ fontSize: '1.2rem' }}>🤖</span>
+              <span style={{
+                fontWeight: 700, color: '#7c3aed', fontSize: '0.85rem',
+                textTransform: 'uppercase', letterSpacing: '0.5px'
+              }}>
+                AI Artist Bio
+              </span>
+            </div>
+            <p style={{
+              color: '#3730a3', lineHeight: 1.8, margin: 0,
+              fontSize: '0.97rem', whiteSpace: 'pre-wrap'
+            }}>
+              {concert.artistBio}
+            </p>
+          </div>
+        )}
 
         {checkoutError && (
           <div style={{ background: '#fee2e2', borderLeft: '4px solid #ef4444', color: '#b91c1c', padding: '15px', marginBottom: '25px', borderRadius: '4px' }}>
