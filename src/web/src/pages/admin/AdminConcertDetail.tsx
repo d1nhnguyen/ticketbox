@@ -126,7 +126,7 @@ export default function AdminConcertDetail() {
     fetchConcert();
     fetchBatches();
     return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   // ── Ticket Type handlers ──────────────────────────────────────────────────
@@ -286,11 +286,11 @@ export default function AdminConcertDetail() {
 
   const statusColors: Record<string, [string, string, string]> = {
     ON_SALE: ['#059669', '#f0fdf4', '#bbf7d0'],
-    DRAFT:   ['#9ca3af', '#f9fafb', '#e5e7eb'],
-    SOLD_OUT:['#dc2626', '#fef2f2', '#fecaca'],
-    CANCELLED:['#dc2626','#fef2f2', '#fecaca'],
+    DRAFT: ['#9ca3af', '#f9fafb', '#e5e7eb'],
+    SOLD_OUT: ['#dc2626', '#fef2f2', '#fecaca'],
+    CANCELLED: ['#dc2626', '#fef2f2', '#fecaca'],
   };
-  const [sc, sbg, sbd] = statusColors[concert.status] ?? ['#9ca3af','#f9fafb','#e5e7eb'];
+  const [sc, sbg, sbd] = statusColors[concert.status] ?? ['#9ca3af', '#f9fafb', '#e5e7eb'];
 
   const TabBtn = ({ tab, label }: { tab: typeof activeTab; label: string }) => (
     <button
@@ -353,10 +353,10 @@ export default function AdminConcertDetail() {
 
       {/* ── Tabs ── */}
       <div style={{ borderBottom: '1px solid #e5e7eb', marginBottom: '0', display: 'flex', gap: '4px' }}>
-        <TabBtn tab="info"    label="✏️ Thông tin" />
+        <TabBtn tab="info" label="✏️ Thông tin" />
         <TabBtn tab="tickets" label="🎟️ Hạng vé" />
-        <TabBtn tab="bio"     label="🤖 AI Artist Bio" />
-        <TabBtn tab="guests"  label="📋 Guest List (CSV)" />
+        <TabBtn tab="bio" label="🤖 AI Artist Bio" />
+        <TabBtn tab="guests" label="📋 Guest List (CSV)" />
       </div>
 
       <div style={{ background: 'white', borderRadius: '0 0 16px 16px', border: '1px solid #e5e7eb', borderTop: 'none', padding: '28px', boxShadow: '0 4px 16px rgba(0,0,0,0.05)' }}>
@@ -718,8 +718,8 @@ export default function AdminConcertDetail() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {batches.map(b => {
                     const statusMap: Record<string, [string, string, string, string]> = {
-                      SUCCESS:    ['✅', '#059669', '#f0fdf4', '#bbf7d0'],
-                      FAILED:     ['❌', '#dc2626', '#fef2f2', '#fecaca'],
+                      SUCCESS: ['✅', '#059669', '#f0fdf4', '#bbf7d0'],
+                      FAILED: ['❌', '#dc2626', '#fef2f2', '#fecaca'],
                       PROCESSING: ['⏳', '#d97706', '#fffbeb', '#fde68a'],
                     };
                     const [icon, sc2, sbg2, sbd2] = statusMap[b.status] ?? ['❓', '#9ca3af', '#f9fafb', '#e5e7eb'];

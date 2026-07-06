@@ -271,7 +271,16 @@ export class OrdersService implements OnModuleInit {
    * skips the release, so `remainingQty` is incremented exactly once.
    */
   private async releaseOrder(orderId: string) {
-    return this.prisma.$transaction(async (tx) => {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { concert: true },
+    });
+
+    if (!order) {
+      return null;
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
       const flip = await tx.order.updateMany({
         where: { id: orderId, status: OrderStatus.PENDING },
         data: { status: OrderStatus.FAILED },
@@ -292,6 +301,12 @@ export class OrdersService implements OnModuleInit {
         include: { items: true },
       });
     });
+
+    if (order.concert?.slug) {
+      await this.cacheService.invalidateConcert(order.concert.slug);
+    }
+
+    return result;
   }
 
   async findOne(id: string, userId: string) {
@@ -318,7 +333,11 @@ export class OrdersService implements OnModuleInit {
   async findAllForUser(userId: string) {
     return this.prisma.order.findMany({
       where: { userId },
-      include: { items: true, tickets: true },
+      include: {
+        items: { include: { ticketType: true } },
+        tickets: { include: { ticketType: true } },
+        concert: true,
+      },
       orderBy: { createdAt: 'desc' },
     });
   }

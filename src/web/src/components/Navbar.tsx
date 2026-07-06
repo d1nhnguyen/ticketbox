@@ -9,11 +9,13 @@ export const Navbar = () => {
       <div>
         {role === 'ORGANIZER' && <Link to="/admin" style={{ marginRight: '20px', color: '#9ca3af', textDecoration: 'none' }}>Admin Dashboard</Link>}
         
-        {/* Nút Hộp thư dành riêng cho Khán giả */}
         {role === 'AUDIENCE' && (
-          <Link to="/notifications" style={{ marginRight: '20px', color: '#fcd34d', textDecoration: 'none', fontWeight: 'bold' }}>
-            🔔 Thông báo
-          </Link>
+          <>
+            <Link to="/dashboard" style={{ marginRight: '20px', color: '#9ca3af', textDecoration: 'none' }}>🎟️ Vé của tôi</Link>
+            <Link to="/notifications" style={{ marginRight: '20px', color: '#fcd34d', textDecoration: 'none', fontWeight: 'bold' }}>
+              🔔 Thông báo
+            </Link>
+          </>
         )}
 
         {role ? (

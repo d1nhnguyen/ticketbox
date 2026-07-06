@@ -6,12 +6,13 @@ import { NotificationsProcessor } from './notifications.processor';
 import { NotificationsListener } from './notifications.listener';
 import { ReminderService } from './reminder.service';
 import { ReminderDebugController } from './reminder-debug.controller';
+import { NotificationsController } from './notifications.controller';
 import { EmailChannel } from './channels/email.channel';
 import { InAppChannel } from './channels/in-app.channel';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 @Module({
-  controllers: [ReminderDebugController],
+  controllers: [ReminderDebugController, NotificationsController],
   imports: [
     BullModule.registerQueue({
       name: 'notifications',

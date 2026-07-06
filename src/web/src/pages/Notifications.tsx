@@ -16,7 +16,6 @@ export default function Notifications() {
   useEffect(() => {
     const fetchNotifications = async () => {
       try {
-        // Gọi API lấy danh sách thông báo của user (Do Person B viết)
         const res = await axios.get('http://localhost:3000/notifications', {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -33,6 +32,27 @@ export default function Notifications() {
     }
   }, [token]);
 
+  const getNotificationDetails = (noti: any) => {
+    let title = noti.payload?.title;
+    let message = noti.payload?.message;
+    let emoji = '📩';
+
+    if (noti.type === 'ORDER_PAID') {
+      title = 'Thanh toán vé thành công! 🎉';
+      message = `Đơn hàng ${noti.payload?.orderId?.substring(0, 8)}... đã được thanh toán thành công với số tiền ${Number(noti.payload?.totalAmount || 0).toLocaleString('vi-VN')} VNĐ. Vé điện tử QR đã được phát hành!`;
+      emoji = '🎟️';
+    } else if (noti.type === 'REMINDER_24H') {
+      title = noti.payload?.title || 'Nhắc nhở sự kiện sắp diễn ra ⏰';
+      message = noti.payload?.message || 'Concert của bạn sẽ bắt đầu trong vòng 24 giờ tới. Hãy chuẩn bị sẵn vé QR!';
+      emoji = '⏰';
+    } else if (noti.type === 'WARNING') {
+      title = title || 'Cảnh báo hệ thống';
+      emoji = '⚠️';
+    }
+
+    return { title: title || 'Thông báo mới', message: message || '', emoji };
+  };
+
   return (
     <div style={{ maxWidth: '800px', margin: '40px auto', padding: '0 20px' }}>
       <h1 style={{ fontSize: '2rem', marginBottom: '20px', color: '#1f2937' }}>🔔 Hộp thư của bạn</h1>
@@ -42,16 +62,20 @@ export default function Notifications() {
       ) : (
         <div style={{ background: 'white', borderRadius: '12px', border: '1px solid #e5e7eb', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
           {notifications.length > 0 ? (
-            notifications.map((noti: any) => (
-              <div key={noti.id} style={{ padding: '20px', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: '15px', alignItems: 'flex-start', background: noti.isRead ? 'white' : '#f0fdf4' }}>
-                <div style={{ fontSize: '1.5rem' }}>{noti.type === 'SUCCESS' ? '✅' : noti.type === 'WARNING' ? '⚠️' : '📩'}</div>
-                <div>
-                  <h3 style={{ fontSize: '1.1rem', marginBottom: '5px', color: noti.isRead ? '#4b5563' : '#111827' }}>{noti.title}</h3>
-                  <p style={{ color: '#6b7280', marginBottom: '10px' }}>{noti.message}</p>
-                  <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>{new Date(noti.createdAt).toLocaleString('vi-VN')}</span>
+            notifications.map((noti: any) => {
+              const { title, message, emoji } = getNotificationDetails(noti);
+              const dateStr = noti.sentAt ? new Date(noti.sentAt).toLocaleString('vi-VN') : 'Vừa xong';
+              return (
+                <div key={noti.id} style={{ padding: '20px', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: '15px', alignItems: 'flex-start', background: noti.status === 'SENT' ? 'white' : '#f9fafb' }}>
+                  <div style={{ fontSize: '1.8rem' }}>{emoji}</div>
+                  <div>
+                    <h3 style={{ fontSize: '1.1rem', marginBottom: '5px', color: '#111827', fontWeight: 600 }}>{title}</h3>
+                    <p style={{ color: '#4b5563', marginBottom: '10px', lineHeight: '1.5' }}>{message}</p>
+                    <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>{dateStr}</span>
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           ) : (
             <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
               <p style={{ fontSize: '3rem', marginBottom: '10px' }}>📭</p>

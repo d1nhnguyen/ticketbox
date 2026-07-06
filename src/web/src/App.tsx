@@ -8,6 +8,7 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import ConcertDetail from './pages/ConcertDetail';
 import OrderSuccess from './pages/OrderSuccess';
+import AudienceDashboard from './pages/AudienceDashboard';
 import Dashboard from './pages/admin/Dashboard';
 import AiBioUpload from './pages/admin/AiBioUpload';
 import CsvUpload from './pages/admin/CsvUpload';
@@ -25,6 +26,7 @@ export default function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/concert/:slug" element={<ConcertDetail />} />
             <Route path="/orders/:id/success" element={<OrderSuccess />} />
+            <Route path="/dashboard" element={<AudienceDashboard />} />
 
             <Route path="/notifications" element={<Notifications />} />
 
