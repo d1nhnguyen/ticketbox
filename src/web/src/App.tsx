@@ -7,6 +7,7 @@ import { Navbar } from './components/Navbar';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import ConcertDetail from './pages/ConcertDetail';
+import OrderSuccess from './pages/OrderSuccess';
 import Dashboard from './pages/admin/Dashboard';
 import AiBioUpload from './pages/admin/AiBioUpload';
 import CsvUpload from './pages/admin/CsvUpload';
@@ -23,6 +24,7 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
             <Route path="/concert/:slug" element={<ConcertDetail />} />
+            <Route path="/orders/:id/success" element={<OrderSuccess />} />
 
             <Route path="/notifications" element={<Notifications />} />
 

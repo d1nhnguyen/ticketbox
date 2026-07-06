@@ -225,7 +225,11 @@ export class OrdersService implements OnModuleInit {
       if (flip.count === 0) {
         return tx.order.findUnique({
           where: { id: orderId },
-          include: { tickets: true, items: true },
+          include: {
+            tickets: { include: { ticketType: true } },
+            items: { include: { ticketType: true } },
+            concert: true,
+          },
         });
       }
 
@@ -244,7 +248,11 @@ export class OrdersService implements OnModuleInit {
 
       return tx.order.findUnique({
         where: { id: orderId },
-        include: { tickets: true, items: true },
+        include: {
+          tickets: { include: { ticketType: true } },
+          items: { include: { ticketType: true } },
+          concert: true,
+        },
       });
     });
 
@@ -289,7 +297,11 @@ export class OrdersService implements OnModuleInit {
   async findOne(id: string, userId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id },
-      include: { items: true, tickets: true },
+      include: {
+        tickets: { include: { ticketType: true } },
+        items: { include: { ticketType: true } },
+        concert: true,
+      },
     });
 
     if (!order) {
