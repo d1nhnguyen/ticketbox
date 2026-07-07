@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -8,20 +8,45 @@ import { useAuth } from '../hooks/useAuth';
 export default function ConcertDetail() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { token, role } = useAuth();
-  
+
   const [concert, setConcert] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  
+
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
   const [issuedTickets, setIssuedTickets] = useState<any[]>([]);
 
+  // Hiển thị lỗi từ cổng thanh toán truyền về nếu có và hủy order ngay lập tức để giải phóng vé
+  useEffect(() => {
+    const errorParam = searchParams.get('payment_error');
+    const orderId = searchParams.get('orderId');
+
+    if (errorParam) {
+      if (errorParam === 'failed') {
+        setCheckoutError('Thanh toán không thành công tại cổng thanh toán. Vui lòng thử lại.');
+      } else if (errorParam === 'cancelled') {
+        setCheckoutError('Bạn đã hủy giao dịch thanh toán. Vé của bạn đã được giải phóng trở lại.');
+      }
+
+      if (orderId && token) {
+        axios.post(`http://localhost:3000/orders/${orderId}/fail`, {}, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }).catch(err => {
+          console.error("Lỗi khi hủy đơn hàng chủ động:", err);
+        });
+      }
+    }
+  }, [searchParams, token]);
+
   // 1. CƠ CHẾ POLLING (Cập nhật số lượng vé Real-time)
   useEffect(() => {
     let isMounted = true;
-    
+
     const fetchConcert = async () => {
       try {
         const res = await axios.get(`http://localhost:3000/concerts/${slug}`);
@@ -63,6 +88,8 @@ export default function ConcertDetail() {
 
   const totalTickets = Object.values(quantities).reduce((a, b) => a + b, 0);
 
+  const activeTicketTypeId = Object.entries(quantities).find(([_, qty]) => qty > 0)?.[0];
+
   const handleCheckout = async () => {
     if (!token) {
       alert('Vui lòng đăng nhập để mua vé!');
@@ -83,41 +110,46 @@ export default function ConcertDetail() {
     setIsCheckingOut(true);
     setCheckoutError('');
 
-    const authHeader = { Authorization: `Bearer ${token}` };
-    const allTickets: any[] = [];
+    if (items.length > 1) {
+      setCheckoutError("Hệ thống hiện tại chỉ hỗ trợ mua 1 loại vé trong một giao dịch. Vui lòng thanh toán riêng từng loại vé!");
+      setIsCheckingOut(false);
+      return;
+    }
+
+    const selectedItem = items[0];
+    const idempotencyKey = crypto.randomUUID();
 
     try {
-      for (const item of items) {
-        const orderRes = await axios.post(
-          'http://localhost:3000/orders',
-          item,
-          {
-            headers: {
-              ...authHeader,
-              'Idempotency-Key': crypto.randomUUID(),
-            },
+      const response = await axios.post(
+        'http://localhost:3000/orders',
+        {
+          ticketTypeId: selectedItem.ticketTypeId,
+          quantity: selectedItem.quantity
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Idempotency-Key': idempotencyKey
           }
-        );
+        }
+      );
 
-        const orderId = orderRes.data.id;
-        const confirmRes = await axios.post(
-          `http://localhost:3000/orders/${orderId}/confirm`,
-          {},
-          { headers: authHeader }
-        );
-
-        allTickets.push(...(confirmRes.data?.tickets ?? []));
-      }
-
-      setIssuedTickets(allTickets);
-      setQuantities({});
+      const orderId = response.data.id;
+      window.location.href = `http://localhost:4000/pay?orderId=${orderId}&amount=${totalAmount}&concertSlug=${slug}`;
     } catch (err: any) {
       const status = err.response?.status;
-      if (status === 409) setCheckoutError('Rất tiếc! Số lượng vé bạn chọn vừa bị mua hết (Oversell Protection).');
-      else if (status === 400) setCheckoutError('Vượt quá giới hạn vé/tài khoản, hoặc thanh toán thất bại.');
-      else if (status === 503) setCheckoutError('Cổng thanh toán đang quá tải (Circuit Breaker mở). Vui lòng thử lại sau!');
-      else if (status === 429) setCheckoutError('Bạn thao tác quá nhanh (Rate Limit). Vui lòng chậm lại.');
-      else setCheckoutError('Đã xảy ra lỗi không xác định. Vui lòng thử lại!');
+      if (status === 409) setCheckoutError("Rất tiếc! Số lượng vé bạn chọn vừa bị mua hết (Oversell Protection).");
+      else if (status === 400) {
+        const msg = err.response?.data?.message;
+        if (Array.isArray(msg)) {
+          setCheckoutError(`Dữ liệu không hợp lệ: ${msg.join(', ')}`);
+        } else {
+          setCheckoutError("Bạn đã chọn vượt quá giới hạn số vé tối đa cho mỗi tài khoản.");
+        }
+      }
+      else if (status === 503) setCheckoutError("Cổng thanh toán hiện đang quá tải (Circuit Breaker Opened). Vui lòng thử lại sau ít phút!");
+      else if (status === 429) setCheckoutError("Bạn đang thao tác quá nhanh. Vui lòng chậm lại (Rate Limit).");
+      else setCheckoutError("Đã xảy ra lỗi không xác định. Vui lòng thử lại!");
     } finally {
       setIsCheckingOut(false);
     }
@@ -147,10 +179,38 @@ export default function ConcertDetail() {
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '30px 20px' }}>
       <Link to="/" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 'bold' }}>← Quay lại danh sách</Link>
-      
+
       <div style={{ marginTop: '30px', background: 'white', padding: '30px', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
         <h1 style={{ fontSize: '2.5rem', marginBottom: '10px' }}>{concert.title}</h1>
-        <p style={{ fontSize: '1.1rem', color: '#4b5563', marginBottom: '30px' }}>📍 {concert.venue} &nbsp;|&nbsp; ⏰ {new Date(concert.startsAt).toLocaleString('vi-VN')}</p>
+        <p style={{ fontSize: '1.1rem', color: '#4b5563', marginBottom: '20px' }}>📍 {concert.venue} &nbsp;|&nbsp; ⏰ {new Date(concert.startsAt).toLocaleString('vi-VN')}</p>
+
+        {/* ===== AI Artist Bio ===== */}
+        {concert.artistBio && (
+          <div style={{
+            background: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
+            border: '1px solid #c4b5fd',
+            borderLeft: '4px solid #7c3aed',
+            borderRadius: '12px',
+            padding: '20px 24px',
+            marginBottom: '28px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+              <span style={{ fontSize: '1.2rem' }}>🤖</span>
+              <span style={{
+                fontWeight: 700, color: '#7c3aed', fontSize: '0.85rem',
+                textTransform: 'uppercase', letterSpacing: '0.5px'
+              }}>
+                AI Artist Bio
+              </span>
+            </div>
+            <p style={{
+              color: '#3730a3', lineHeight: 1.8, margin: 0,
+              fontSize: '0.97rem', whiteSpace: 'pre-wrap'
+            }}>
+              {concert.artistBio}
+            </p>
+          </div>
+        )}
 
         {checkoutError && (
           <div style={{ background: '#fee2e2', borderLeft: '4px solid #ef4444', color: '#b91c1c', padding: '15px', marginBottom: '25px', borderRadius: '4px' }}>
@@ -159,11 +219,11 @@ export default function ConcertDetail() {
         )}
 
         <div style={{ display: 'flex', gap: '40px', flexWrap: 'wrap' }}>
-          
+
           {/* Cột trái: 2. BẢN ĐỒ SVG TƯƠNG TÁC */}
           <div style={{ flex: '1 1 500px', background: '#f8fafc', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column' }}>
             <h3 style={{ fontSize: '1.3rem', marginBottom: '20px', color: '#334155', textAlign: 'center' }}>Sơ đồ & Tình trạng ghế</h3>
-            
+
             <svg viewBox="0 0 800 600" style={{ width: '100%', height: '100%', minHeight: '400px', userSelect: 'none' }}>
               {/* Vẽ Sân Khấu (Stage) */}
               <rect x="250" y="20" width="300" height="80" rx="15" fill="#1e293b" />
@@ -174,7 +234,8 @@ export default function ConcertDetail() {
                 const isSoldOut = ticket.remainingQty === 0;
                 const qtySelected = quantities[ticket.id] || 0;
                 const isSelected = qtySelected > 0;
-                
+                const isLocked = activeTicketTypeId && ticket.id !== activeTicketTypeId;
+
                 // Toán học để tự động xếp các khu vực thành 2 cột (Trái/Phải) và dồn dần về phía sau
                 const row = Math.floor(index / 2);
                 const col = index % 2;
@@ -183,12 +244,12 @@ export default function ConcertDetail() {
                 const x = col === 0 ? 80 : 420;
                 const y = 140 + (row * 140);
 
-                // Logic Màu sắc: Xám (Hết vé), Xanh đậm (Đang chọn), Xanh nhạt (Còn trống)
-                let fillColor = '#bae6fd'; 
+                // Logic Màu sắc: Xám (Hết vé hoặc bị khóa), Xanh đậm (Đang chọn), Xanh nhạt (Còn trống)
+                let fillColor = '#bae6fd';
                 let textColor = '#0369a1';
                 let strokeColor = '#7dd3fc';
 
-                if (isSoldOut) {
+                if (isSoldOut || isLocked) {
                   fillColor = '#f1f5f9';
                   textColor = '#94a3b8';
                   strokeColor = '#cbd5e1';
@@ -199,19 +260,19 @@ export default function ConcertDetail() {
                 }
 
                 return (
-                  <g 
-                    key={ticket.id} 
+                  <g
+                    key={ticket.id}
                     onClick={() => {
-                      if (!isSoldOut && qtySelected < ticket.maxPerUser) {
+                      if (!isSoldOut && !isLocked && qtySelected < ticket.maxPerUser) {
                         // Tăng số lượng vé lên 1 khi click vào bản đồ
                         handleQuantityChange(ticket.id, 1, ticket.maxPerUser, ticket.remainingQty);
                       }
-                    }} 
-                    style={{ cursor: isSoldOut ? 'not-allowed' : 'pointer', transition: 'all 0.2s ease-in-out' }}
+                    }}
+                    style={{ cursor: (isSoldOut || isLocked) ? 'not-allowed' : 'pointer', transition: 'all 0.2s ease-in-out', opacity: isLocked ? 0.5 : 1 }}
                   >
                     <rect x={x} y={y} width={width} height={height} rx="12" fill={fillColor} stroke={strokeColor} strokeWidth={isSelected ? 4 : 2} />
-                    <text x={x + width/2} y={y + 45} fill={textColor} fontSize="22" fontWeight="bold" textAnchor="middle">{ticket.name}</text>
-                    <text x={x + width/2} y={y + 75} fill={isSelected ? '#bfdbfe' : textColor} fontSize="16" textAnchor="middle">
+                    <text x={x + width / 2} y={y + 45} fill={textColor} fontSize="22" fontWeight="bold" textAnchor="middle">{ticket.name}</text>
+                    <text x={x + width / 2} y={y + 75} fill={isSelected ? '#bfdbfe' : textColor} fontSize="16" textAnchor="middle">
                       {isSoldOut ? 'HẾT VÉ' : `Còn trống: ${ticket.remainingQty}`}
                     </text>
                     {isSelected && (
@@ -232,38 +293,46 @@ export default function ConcertDetail() {
           {/* Cột phải: Danh sách vé & Mua hàng */}
           <div style={{ flex: '1 1 350px', display: 'flex', flexDirection: 'column' }}>
             <h3 style={{ fontSize: '1.5rem', marginBottom: '20px' }}>Giỏ hàng của bạn</h3>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', flexGrow: 1 }}>
               {concert.ticketTypes?.map((ticket: any) => {
                 const qty = quantities[ticket.id] || 0;
                 const isSoldOut = ticket.remainingQty === 0;
+                const isLocked = activeTicketTypeId && ticket.id !== activeTicketTypeId;
 
                 return (
-                  <div key={ticket.id} style={{ padding: '15px', border: qty > 0 ? '2px solid #3b82f6' : '1px solid #e5e7eb', borderRadius: '10px', background: isSoldOut ? '#f9fafb' : 'white', transition: 'all 0.2s' }}>
+                  <div key={ticket.id} style={{
+                    padding: '15px',
+                    border: qty > 0 ? '2px solid #3b82f6' : '1px solid #e5e7eb',
+                    borderRadius: '10px',
+                    background: (isSoldOut || isLocked) ? '#f9fafb' : 'white',
+                    opacity: isLocked ? 0.5 : 1,
+                    transition: 'all 0.2s'
+                  }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                       <div>
-                        <div style={{ fontWeight: 'bold', fontSize: '1.2rem', color: isSoldOut ? '#9ca3af' : '#111827' }}>{ticket.name}</div>
-                        <div style={{ color: isSoldOut ? '#9ca3af' : '#ef4444', fontWeight: 'bold', marginTop: '5px' }}>
+                        <div style={{ fontWeight: 'bold', fontSize: '1.2rem', color: (isSoldOut || isLocked) ? '#9ca3af' : '#111827' }}>{ticket.name}</div>
+                        <div style={{ color: (isSoldOut || isLocked) ? '#9ca3af' : '#ef4444', fontWeight: 'bold', marginTop: '5px' }}>
                           {ticket.price.toLocaleString('vi-VN')} VNĐ
                         </div>
                       </div>
                       <div style={{ textAlign: 'right', fontSize: '0.85rem', color: '#6b7280' }}>
-                        <div>Còn lại: <strong style={{ color: isSoldOut ? '#ef4444' : '#059669' }}>{ticket.remainingQty}</strong></div>
+                        <div>Còn lại: <strong style={{ color: isSoldOut ? '#ef4444' : (isLocked ? '#9ca3af' : '#059669') }}>{ticket.remainingQty}</strong></div>
                         <div>Giới hạn: <strong>{ticket.maxPerUser}/người</strong></div>
                       </div>
                     </div>
 
                     {!isSoldOut && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginTop: '15px', borderTop: '1px dashed #e5e7eb', paddingTop: '15px' }}>
-                        <button 
+                        <button
                           onClick={() => handleQuantityChange(ticket.id, -1, ticket.maxPerUser, ticket.remainingQty)}
-                          disabled={qty === 0}
-                          style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1px solid #d1d5db', background: qty === 0 ? '#f3f4f6' : 'white', cursor: qty === 0 ? 'not-allowed' : 'pointer', fontWeight: 'bold', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>-</button>
-                        <span style={{ fontWeight: 'bold', fontSize: '1.2rem', width: '30px', textAlign: 'center' }}>{qty}</span>
-                        <button 
+                          disabled={qty === 0 || isLocked}
+                          style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1px solid #d1d5db', background: (qty === 0 || isLocked) ? '#f3f4f6' : 'white', cursor: (qty === 0 || isLocked) ? 'not-allowed' : 'pointer', fontWeight: 'bold', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>-</button>
+                        <span style={{ fontWeight: 'bold', fontSize: '1.2rem', width: '30px', textAlign: 'center', color: isLocked ? '#9ca3af' : '#111827' }}>{qty}</span>
+                        <button
                           onClick={() => handleQuantityChange(ticket.id, 1, ticket.maxPerUser, ticket.remainingQty)}
-                          disabled={qty >= ticket.maxPerUser || qty >= ticket.remainingQty}
-                          style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1px solid #d1d5db', background: (qty >= ticket.maxPerUser || qty >= ticket.remainingQty) ? '#f3f4f6' : 'white', cursor: (qty >= ticket.maxPerUser || qty >= ticket.remainingQty) ? 'not-allowed' : 'pointer', fontWeight: 'bold', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                          disabled={qty >= ticket.maxPerUser || qty >= ticket.remainingQty || isLocked}
+                          style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1px solid #d1d5db', background: (qty >= ticket.maxPerUser || qty >= ticket.remainingQty || isLocked) ? '#f3f4f6' : 'white', cursor: (qty >= ticket.maxPerUser || qty >= ticket.remainingQty || isLocked) ? 'not-allowed' : 'pointer', fontWeight: 'bold', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
                       </div>
                     )}
                     {isSoldOut && <div style={{ marginTop: '10px', color: '#ef4444', fontWeight: 'bold', textAlign: 'center', padding: '10px 0', background: '#fee2e2', borderRadius: '6px' }}>ĐÃ BÁN HẾT</div>}
@@ -282,7 +351,7 @@ export default function ConcertDetail() {
                 <span>Tổng tiền:</span>
                 <span style={{ fontWeight: 'bold', color: '#38bdf8' }}>{totalAmount.toLocaleString('vi-VN')} VNĐ</span>
               </div>
-              <button 
+              <button
                 onClick={handleCheckout}
                 disabled={totalTickets === 0 || isCheckingOut}
                 style={{ width: '100%', padding: '16px', background: (totalTickets === 0 || isCheckingOut) ? '#334155' : '#2563eb', color: (totalTickets === 0 || isCheckingOut) ? '#94a3b8' : 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '1.2rem', cursor: (totalTickets === 0 || isCheckingOut) ? 'not-allowed' : 'pointer', transition: 'background 0.2s' }}>

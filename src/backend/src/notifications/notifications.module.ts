@@ -1,22 +1,28 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
+import { ScheduleModule } from '@nestjs/schedule';
 import { NotificationsService } from './notifications.service';
 import { NotificationsProcessor } from './notifications.processor';
 import { NotificationsListener } from './notifications.listener';
+import { ReminderService } from './reminder.service';
+import { ReminderDebugController } from './reminder-debug.controller';
 import { EmailChannel } from './channels/email.channel';
 import { InAppChannel } from './channels/in-app.channel';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 @Module({
+  controllers: [ReminderDebugController],
   imports: [
     BullModule.registerQueue({
       name: 'notifications',
     }),
+    ScheduleModule.forRoot(),
   ],
   providers: [
     NotificationsService,
     NotificationsProcessor,
     NotificationsListener,
+    ReminderService,
     EmailChannel,
     InAppChannel,
     PrismaService,
