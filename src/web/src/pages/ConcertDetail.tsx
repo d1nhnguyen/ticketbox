@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { QRCodeSVG } from 'qrcode.react';
+
 import { useAuth } from '../hooks/useAuth';
 
 export default function ConcertDetail() {
@@ -14,6 +16,7 @@ export default function ConcertDetail() {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
+  const [issuedTickets, setIssuedTickets] = useState<any[]>([]);
 
   // 1. CƠ CHẾ POLLING (Cập nhật số lượng vé Real-time)
   useEffect(() => {
@@ -62,46 +65,59 @@ export default function ConcertDetail() {
 
   const handleCheckout = async () => {
     if (!token) {
-      alert("Vui lòng đăng nhập để mua vé!");
+      alert('Vui lòng đăng nhập để mua vé!');
       navigate('/login');
       return;
     }
     if (role !== 'AUDIENCE') {
-      setCheckoutError("Chỉ tài khoản Khán giả (AUDIENCE) mới có thể mua vé.");
+      setCheckoutError('Chỉ tài khoản Khán giả (AUDIENCE) mới có thể mua vé.');
       return;
     }
+
+    const items = Object.entries(quantities)
+      .filter(([, qty]) => qty > 0)
+      .map(([ticketTypeId, quantity]) => ({ ticketTypeId, quantity }));
+
+    if (items.length === 0) return;
 
     setIsCheckingOut(true);
     setCheckoutError('');
 
-    const items = Object.entries(quantities)
-      .filter(([_, qty]) => qty > 0)
-      .map(([ticketTypeId, quantity]) => ({ ticketTypeId, quantity }));
-
-    const idempotencyKey = crypto.randomUUID();
+    const authHeader = { Authorization: `Bearer ${token}` };
+    const allTickets: any[] = [];
 
     try {
-      const response = await axios.post(
-        'http://localhost:3000/orders',
-        { concertId: concert.id, items },
-        { 
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            'Idempotency-Key': idempotencyKey 
-          } 
-        }
-      );
+      for (const item of items) {
+        const orderRes = await axios.post(
+          'http://localhost:3000/orders',
+          item,
+          {
+            headers: {
+              ...authHeader,
+              'Idempotency-Key': crypto.randomUUID(),
+            },
+          }
+        );
 
-      const orderId = response.data.id;
-      window.location.href = `http://localhost:4000/pay?orderId=${orderId}&amount=${totalAmount}`;
+        const orderId = orderRes.data.id;
+        const confirmRes = await axios.post(
+          `http://localhost:3000/orders/${orderId}/confirm`,
+          {},
+          { headers: authHeader }
+        );
 
+        allTickets.push(...(confirmRes.data?.tickets ?? []));
+      }
+
+      setIssuedTickets(allTickets);
+      setQuantities({});
     } catch (err: any) {
       const status = err.response?.status;
-      if (status === 409) setCheckoutError("Rất tiếc! Số lượng vé bạn chọn vừa bị mua hết (Oversell Protection).");
-      else if (status === 400) setCheckoutError("Bạn đã chọn vượt quá giới hạn số vé tối đa cho mỗi tài khoản.");
-      else if (status === 503) setCheckoutError("Cổng thanh toán hiện đang quá tải (Circuit Breaker Opened). Vui lòng thử lại sau ít phút!");
-      else if (status === 429) setCheckoutError("Bạn đang thao tác quá nhanh. Vui lòng chậm lại (Rate Limit).");
-      else setCheckoutError("Đã xảy ra lỗi không xác định. Vui lòng thử lại!");
+      if (status === 409) setCheckoutError('Rất tiếc! Số lượng vé bạn chọn vừa bị mua hết (Oversell Protection).');
+      else if (status === 400) setCheckoutError('Vượt quá giới hạn vé/tài khoản, hoặc thanh toán thất bại.');
+      else if (status === 503) setCheckoutError('Cổng thanh toán đang quá tải (Circuit Breaker mở). Vui lòng thử lại sau!');
+      else if (status === 429) setCheckoutError('Bạn thao tác quá nhanh (Rate Limit). Vui lòng chậm lại.');
+      else setCheckoutError('Đã xảy ra lỗi không xác định. Vui lòng thử lại!');
     } finally {
       setIsCheckingOut(false);
     }
@@ -109,6 +125,24 @@ export default function ConcertDetail() {
 
   if (loading) return <div style={{ padding: '50px', textAlign: 'center', fontSize: '1.2rem' }}>⏳ Đang tải dữ liệu thực tế...</div>;
   if (!concert) return <div style={{ padding: '50px', textAlign: 'center', color: 'red' }}>Không tìm thấy Concert!</div>;
+
+  if (issuedTickets.length > 0) {
+    return (
+      <div style={{ maxWidth: '700px', margin: '40px auto', padding: '20px', textAlign: 'center' }}>
+        <h1 style={{ fontSize: '2rem', marginBottom: '10px' }}>🎉 Thanh toán thành công!</h1>
+        <p style={{ color: '#4b5563', marginBottom: '24px' }}>Vui lòng xuất trình mã QR dưới đây tại cổng sự kiện.</p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px', justifyContent: 'center' }}>
+          {issuedTickets.map((ticket) => (
+            <div key={ticket.id} style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
+              <QRCodeSVG value={ticket.qrCode} size={180} />
+              <div style={{ marginTop: '10px', fontSize: '12px', color: '#6b7280' }}>{ticket.qrCode}</div>
+            </div>
+          ))}
+        </div>
+        <Link to="/" style={{ display: 'inline-block', marginTop: '24px', color: '#2563eb', fontWeight: 'bold' }}>← Về trang chủ</Link>
+      </div>
+    );
+  }
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '30px 20px' }}>

@@ -16,13 +16,28 @@ export default function Notifications() {
   useEffect(() => {
     const fetchNotifications = async () => {
       try {
-        // Gọi API lấy danh sách thông báo của user (Do Person B viết)
         const res = await axios.get('http://localhost:3000/notifications', {
           headers: { Authorization: `Bearer ${token}` }
         });
-        setNotifications(res.data);
+
+        const rows = Array.isArray(res.data) ? res.data : (res.data?.items ?? []);
+        const normalized = rows.map((item: any) => {
+          const payload = item.payload ?? {};
+          const title = item.title ?? payload.title ?? payload.message ?? 'Thông báo';
+          const message = item.message ?? payload.message ?? payload.body ?? '';
+          return {
+            ...item,
+            title,
+            message,
+            isRead: Boolean(item.isRead ?? payload.isRead ?? false),
+            type: item.type ?? payload.type ?? 'INFO',
+            createdAt: item.createdAt ?? payload.createdAt ?? new Date().toISOString(),
+          };
+        });
+
+        setNotifications(normalized);
       } catch (err) {
-        console.error("Lỗi tải thông báo:", err);
+        console.error('Lỗi tải thông báo:', err);
       } finally {
         setLoading(false);
       }
