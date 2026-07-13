@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { GuestsController } from './guests.controller';
+import { GuestVerificationController } from './guest-verification.controller';
 import { GuestsService } from './guests.service';
 import { GuestsProcessor } from './guests.processor';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -11,7 +12,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
       name: 'guests',
     }),
   ],
-  controllers: [GuestsController],
+  controllers: [GuestsController, GuestVerificationController],
   providers: [GuestsService, GuestsProcessor, PrismaService],
   exports: [GuestsService],
 })
