@@ -10,6 +10,7 @@ export default function AudienceDashboard() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'tickets' | 'history'>('tickets');
   const [selectedQr, setSelectedQr] = useState<{ code: string; title: string; type: string } | null>(null);
+  const [payingOrderId, setPayingOrderId] = useState<string | null>(null);
 
   // Chỉ Khán giả mới được vào trang này
   if (!token) {
@@ -35,6 +36,24 @@ export default function AudienceDashboard() {
   useEffect(() => {
     fetchOrders();
   }, [token]);
+
+  const handlePayment = async (order: any, method: 'VNPAY' | 'MOCK') => {
+    setPayingOrderId(order.id);
+    try {
+      if (method === 'VNPAY') {
+        const vnpayRes = await axios.get(
+          `http://localhost:3000/orders/vnpay/url/${order.id}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        window.location.href = vnpayRes.data.url;
+      } else {
+        window.location.href = `http://localhost:4000/pay?orderId=${order.id}&amount=${order.totalAmount}&concertSlug=${order.concert?.slug}`;
+      }
+    } catch (err: any) {
+      alert('Có lỗi xảy ra khi tạo link thanh toán: ' + (err.response?.data?.message || err.message));
+      setPayingOrderId(null);
+    }
+  };
 
   // Lấy danh sách tất cả các vé từ các đơn hàng đã thanh toán (PAID)
   const paidTickets = orders
@@ -267,23 +286,42 @@ export default function AudienceDashboard() {
                             </td>
                             <td style={{ padding: '15px 20px' }}>
                               {order.status === 'PENDING' && (
-                                <button
-                                  onClick={() => {
-                                    window.location.href = `http://localhost:4000/pay?orderId=${order.id}&amount=${order.totalAmount}&concertSlug=${order.concert?.slug}`;
-                                  }}
-                                  style={{
-                                    background: '#2563eb',
-                                    color: 'white',
-                                    padding: '6px 14px',
-                                    border: 'none',
-                                    borderRadius: '6px',
-                                    fontWeight: 'bold',
-                                    cursor: 'pointer',
-                                    fontSize: '0.85rem'
-                                  }}
-                                >
-                                  Thanh toán ngay
-                                </button>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                  <button
+                                    onClick={() => handlePayment(order, 'VNPAY')}
+                                    disabled={payingOrderId === order.id}
+                                    style={{
+                                      background: '#2563eb',
+                                      color: 'white',
+                                      padding: '6px 14px',
+                                      border: 'none',
+                                      borderRadius: '6px',
+                                      fontWeight: 'bold',
+                                      cursor: payingOrderId === order.id ? 'not-allowed' : 'pointer',
+                                      fontSize: '0.85rem',
+                                      opacity: payingOrderId === order.id ? 0.7 : 1
+                                    }}
+                                  >
+                                    {payingOrderId === order.id ? 'Đang tải...' : 'Thanh toán (VNPay)'}
+                                  </button>
+                                  <button
+                                    onClick={() => handlePayment(order, 'MOCK')}
+                                    disabled={payingOrderId === order.id}
+                                    style={{
+                                      background: '#475569',
+                                      color: 'white',
+                                      padding: '6px 14px',
+                                      border: 'none',
+                                      borderRadius: '6px',
+                                      fontWeight: 'bold',
+                                      cursor: payingOrderId === order.id ? 'not-allowed' : 'pointer',
+                                      fontSize: '0.85rem',
+                                      opacity: payingOrderId === order.id ? 0.7 : 1
+                                    }}
+                                  >
+                                    Thanh toán (Mock)
+                                  </button>
+                                </div>
                               )}
                               {order.status === 'PAID' && (
                                 <span style={{ color: '#16a34a', fontWeight: 'bold', fontSize: '0.85rem' }}>✓ Hoàn tất</span>

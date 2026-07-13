@@ -33,7 +33,7 @@ export class AuthService {
       data: {
         email,
         passwordHash,
-        role: role || Role.AUDIENCE,
+        role: Role.AUDIENCE, // Force role to AUDIENCE for self-registration
       },
     });
 

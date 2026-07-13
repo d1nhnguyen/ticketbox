@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../hooks/useAuth';
 
@@ -54,6 +54,9 @@ export default function Login() {
             {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
           </button>
         </form>
+        <div style={{ textAlign: 'center', marginTop: '20px', fontSize: '0.9rem' }}>
+          Chưa có tài khoản? <Link to="/register" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 'bold' }}>Đăng ký ngay</Link>
+        </div>
       </div>
     </div>
   );

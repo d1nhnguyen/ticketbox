@@ -15,6 +15,7 @@ import CsvUpload from './pages/admin/CsvUpload';
 import AdminConcertDetail from './pages/admin/AdminConcertDetail';
 import Notifications from './pages/Notifications';
 import VNPayReturn from './pages/VNPayReturn';
+import Register from './pages/Register';
 
 export default function App() {
   return (
@@ -29,8 +30,13 @@ export default function App() {
             <Route path="/orders/:id/success" element={<OrderSuccess />} />
             <Route path="/dashboard" element={<AudienceDashboard />} />
 
-            <Route path="/notifications" element={<Notifications />} />
+            <Route path="/register" element={<Register />} />
             <Route path="/vnpay-return" element={<VNPayReturn />} />
+
+            {/* Tuyến đường được bảo vệ chung (yêu cầu đăng nhập) */}
+            <Route element={<ProtectedRoute />}>
+              <Route path="/notifications" element={<Notifications />} />
+            </Route>
 
             {/* Tuyến đường được bảo vệ cho Admin */}
             <Route element={<ProtectedRoute allowedRoles={['ORGANIZER']} />}>

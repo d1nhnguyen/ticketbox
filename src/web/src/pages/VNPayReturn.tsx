@@ -16,7 +16,7 @@ export default function VNPayReturn() {
         // Send the entire query string to the backend for verification
         const queryString = searchParams.toString();
         const res = await axios.get(`http://localhost:3000/orders/vnpay/return?${queryString}`);
-        
+
         if (res.data.success) {
           setStatus('success');
           setMessage('Thanh toán thành công!');
@@ -25,15 +25,15 @@ export default function VNPayReturn() {
           setStatus('error');
           setMessage(`Thanh toán thất bại: ${res.data.message || 'Lỗi không xác định'}`);
           setOrderId(res.data.data?.orderId);
-          
+
           // Tự động giải phóng order nếu user hủy/thất bại để nhả vé
           if (res.data.data?.orderId) {
             try {
               const token = localStorage.getItem('token');
               if (token) {
-                 await axios.post(`http://localhost:3000/orders/${res.data.data.orderId}/fail`, {}, {
-                   headers: { Authorization: `Bearer ${token}` }
-                 });
+                await axios.post(`http://localhost:3000/orders/${res.data.data.orderId}/fail`, {}, {
+                  headers: { Authorization: `Bearer ${token}` }
+                });
               }
             } catch (e) {
               console.error('Failed to release order after VNPay error', e);
@@ -67,7 +67,7 @@ export default function VNPayReturn() {
           <p style={{ color: '#4b5563', marginBottom: '25px', lineHeight: '1.6' }}>
             Đơn hàng của bạn đã được xác nhận. Vé điện tử QR đã được phát hành thành công.
           </p>
-          <button 
+          <button
             onClick={() => navigate('/dashboard')}
             style={{ padding: '12px 24px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}
           >
@@ -84,7 +84,7 @@ export default function VNPayReturn() {
             {message}
           </p>
           <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
-            <button 
+            <button
               onClick={() => navigate('/')}
               style={{ padding: '12px 24px', background: 'white', color: '#4b5563', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '1rem', cursor: 'pointer', fontWeight: 'bold' }}
             >
