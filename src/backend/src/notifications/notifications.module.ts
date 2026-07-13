@@ -30,4 +30,4 @@ import { PrismaService } from 'src/prisma/prisma.service';
   ],
   exports: [NotificationsService],
 })
-export class NotificationsModule {}
+export class NotificationsModule { }

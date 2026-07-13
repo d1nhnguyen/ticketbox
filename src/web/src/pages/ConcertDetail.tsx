@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
+import { QRCodeSVG } from 'qrcode.react';
+
 import { useAuth } from '../hooks/useAuth';
 
 export default function ConcertDetail() {
@@ -15,6 +17,7 @@ export default function ConcertDetail() {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
+  const [issuedTickets, setIssuedTickets] = useState<any[]>([]);
 
   // Hiển thị lỗi từ cổng thanh toán truyền về nếu có và hủy order ngay lập tức để giải phóng vé
   useEffect(() => {
@@ -89,26 +92,23 @@ export default function ConcertDetail() {
 
   const handleCheckout = async () => {
     if (!token) {
-      alert("Vui lòng đăng nhập để mua vé!");
+      alert('Vui lòng đăng nhập để mua vé!');
       navigate('/login');
       return;
     }
     if (role !== 'AUDIENCE') {
-      setCheckoutError("Chỉ tài khoản Khán giả (AUDIENCE) mới có thể mua vé.");
+      setCheckoutError('Chỉ tài khoản Khán giả (AUDIENCE) mới có thể mua vé.');
       return;
     }
+
+    const items = Object.entries(quantities)
+      .filter(([, qty]) => qty > 0)
+      .map(([ticketTypeId, quantity]) => ({ ticketTypeId, quantity }));
+
+    if (items.length === 0) return;
 
     setIsCheckingOut(true);
     setCheckoutError('');
-
-    const items = Object.entries(quantities)
-      .filter(([_, qty]) => qty > 0)
-      .map(([ticketTypeId, quantity]) => ({ ticketTypeId, quantity }));
-
-    if (items.length === 0) {
-      setIsCheckingOut(false);
-      return;
-    }
 
     if (items.length > 1) {
       setCheckoutError("Hệ thống hiện tại chỉ hỗ trợ mua 1 loại vé trong một giao dịch. Vui lòng thanh toán riêng từng loại vé!");
@@ -136,7 +136,6 @@ export default function ConcertDetail() {
 
       const orderId = response.data.id;
       window.location.href = `http://localhost:4000/pay?orderId=${orderId}&amount=${totalAmount}&concertSlug=${slug}`;
-
     } catch (err: any) {
       const status = err.response?.status;
       if (status === 409) setCheckoutError("Rất tiếc! Số lượng vé bạn chọn vừa bị mua hết (Oversell Protection).");
@@ -161,13 +160,31 @@ export default function ConcertDetail() {
   if (loading) return <div style={{ padding: '50px', textAlign: 'center', fontSize: '1.2rem' }}>⏳ Đang tải dữ liệu thực tế...</div>;
   if (!concert) return <div style={{ padding: '50px', textAlign: 'center', color: 'red' }}>Không tìm thấy Concert!</div>;
 
+  if (issuedTickets.length > 0) {
+    return (
+      <div style={{ maxWidth: '700px', margin: '40px auto', padding: '20px', textAlign: 'center' }}>
+        <h1 style={{ fontSize: '2rem', marginBottom: '10px' }}>🎉 Thanh toán thành công!</h1>
+        <p style={{ color: '#4b5563', marginBottom: '24px' }}>Vui lòng xuất trình mã QR dưới đây tại cổng sự kiện.</p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px', justifyContent: 'center' }}>
+          {issuedTickets.map((ticket) => (
+            <div key={ticket.id} style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
+              <QRCodeSVG value={ticket.qrCode} size={180} />
+              <div style={{ marginTop: '10px', fontSize: '12px', color: '#6b7280' }}>{ticket.qrCode}</div>
+            </div>
+          ))}
+        </div>
+        <Link to="/" style={{ display: 'inline-block', marginTop: '24px', color: '#2563eb', fontWeight: 'bold' }}>← Về trang chủ</Link>
+      </div>
+    );
+  }
+
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '30px 20px' }}>
       <Link to="/" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 'bold' }}>← Quay lại danh sách</Link>
 
       <div style={{ marginTop: '30px', background: 'white', padding: '30px', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
-        <h1 style={{ fontSize: '2.5rem', marginBottom: '10px' }}>{concert.title}</h1>
-        <p style={{ fontSize: '1.1rem', color: '#4b5563', marginBottom: '20px' }}>📍 {concert.venue} &nbsp;|&nbsp; ⏰ {new Date(concert.startsAt).toLocaleString('vi-VN')}</p>
+        <h1 style={{ fontSize: '2.5rem', marginBottom: '10px', color: '#000000ff' }}>{concert.title}</h1>
+        <p style={{ fontSize: '1.1rem', color: '#4b5563', marginBottom: '20px', paddingTop: '30px' }}>📍 {concert.venue} &nbsp;|&nbsp; ⏰ {new Date(concert.startsAt).toLocaleString('vi-VN')}</p>
 
         {/* ===== AI Artist Bio ===== */}
         {concert.artistBio && (

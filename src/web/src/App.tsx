@@ -40,8 +40,8 @@ export default function App() {
 
             {/* Task C2a: Scanner Placeholder */}
             <Route path="/scanner" element={
-              <div style={{ padding: '40px', textAlign: 'center', color: '#111827' }}>
-                <h2>📱 Ứng dụng Soát vé (Scanner PWA)</h2>
+              <div style={{ padding: '40px', textAlign: 'center' }}>
+                <h2 style={{ color: '#111827' }}>📱 Ứng dụng Soát vé (Scanner PWA)</h2>
                 <p style={{ color: '#4b5563', marginTop: '10px' }}>Tính năng này đang được phát triển ở Tuần 3.</p>
               </div>
             } />
