@@ -56,6 +56,30 @@ services:
       redis:
         condition: service_healthy
 
+  web:
+    image: node:20-alpine
+    container_name: ticketbox_web
+    working_dir: /app
+    volumes:
+      - ./src/web:/app
+    ports:
+      - "5173:5173"
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    depends_on:
+      - backend
+
+  scanner:
+    image: node:20-alpine
+    container_name: ticketbox_scanner
+    working_dir: /app
+    volumes:
+      - ./src/scanner:/app
+    ports:
+      - "5174:5174"
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5174"
+    depends_on:
+      - backend
+
 volumes:
   postgres_data:
   redis_data:

@@ -25,6 +25,14 @@ interface GuestBatch {
   createdAt: string;
 }
 
+interface GuestEntry {
+  id: string;
+  fullName: string;
+  docId: string | null;
+  zone: string;
+  status: string;
+}
+
 interface Concert {
   id: string;
   title: string;
@@ -92,6 +100,7 @@ export default function AdminConcertDetail() {
   const [csvError, setCsvError] = useState('');
   const [csvDragOver, setCsvDragOver] = useState(false);
   const [batches, setBatches] = useState<GuestBatch[]>([]);
+  const [guests, setGuests] = useState<GuestEntry[]>([]);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Fetch concert ─────────────────────────────────────────────────────────
@@ -122,9 +131,17 @@ export default function AdminConcertDetail() {
     } catch { /* silent */ }
   };
 
+  const fetchGuests = async () => {
+    try {
+      const res = await axios.get(`${API}/admin/concerts/${id}/guests/list`, { headers: authHeader });
+      setGuests(res.data);
+    } catch { /* silent */ }
+  };
+
   useEffect(() => {
     fetchConcert();
     fetchBatches();
+    fetchGuests();
     return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
@@ -251,6 +268,7 @@ export default function AdminConcertDetail() {
     if (pollingRef.current) clearInterval(pollingRef.current);
     pollingRef.current = setInterval(async () => {
       await fetchBatches();
+      await fetchGuests();
     }, 2000);
     setTimeout(() => { if (pollingRef.current) clearInterval(pollingRef.current); }, 30000);
   };
@@ -709,7 +727,7 @@ export default function AdminConcertDetail() {
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                 <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#374151' }}>📜 Lịch sử Import</h3>
-                <button onClick={fetchBatches} style={{ background: 'none', border: '1px solid #d1d5db', borderRadius: '6px', padding: '5px 12px', cursor: 'pointer', color: '#4b5563', fontSize: '0.82rem' }}>🔄 Refresh</button>
+                <button onClick={() => { fetchBatches(); fetchGuests(); }} style={{ background: 'none', border: '1px solid #d1d5db', borderRadius: '6px', padding: '5px 12px', cursor: 'pointer', color: '#4b5563', fontSize: '0.82rem' }}>🔄 Refresh</button>
               </div>
 
               {batches.length === 0 ? (
@@ -739,6 +757,44 @@ export default function AdminConcertDetail() {
                       </div>
                     );
                   })}
+                </div>
+              )}
+            </div>
+
+            {/* Current Guest List */}
+            <div style={{ marginTop: '40px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#374151' }}>👥 Danh sách Khách mời ({guests.length})</h3>
+              </div>
+
+              {guests.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '32px', color: '#9ca3af', background: '#f9fafb', borderRadius: '10px', border: '1px solid #f3f4f6' }}>Chưa có khách mời nào.</div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                    <thead>
+                      <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                        <th style={{ padding: '12px', textAlign: 'left', color: '#475569', fontWeight: 600 }}>Tên (fullName)</th>
+                        <th style={{ padding: '12px', textAlign: 'left', color: '#475569', fontWeight: 600 }}>Căn cước (docId)</th>
+                        <th style={{ padding: '12px', textAlign: 'left', color: '#475569', fontWeight: 600 }}>Khu vực (zone)</th>
+                        <th style={{ padding: '12px', textAlign: 'center', color: '#475569', fontWeight: 600 }}>Trạng thái</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {guests.map(g => (
+                        <tr key={g.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '12px', color: '#0f172a', fontWeight: 500 }}>{g.fullName}</td>
+                          <td style={{ padding: '12px', color: '#64748b' }}>{g.docId || '-'}</td>
+                          <td style={{ padding: '12px', color: '#64748b' }}>{g.zone || '-'}</td>
+                          <td style={{ padding: '12px', textAlign: 'center' }}>
+                            <span style={badgeStyle(...(g.status === 'CHECKED_IN' ? ['#059669', '#f0fdf4', '#bbf7d0'] : ['#d97706', '#fffbeb', '#fde68a']) as [string, string, string])}>
+                              {g.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>

@@ -147,4 +147,10 @@ export class GuestsService {
       throw new NotFoundException(`Concert ${concertId} not found`);
     }
   }
+
+  async getList(concertId: string) {
+    return this.prisma.guestListEntry.findMany({
+      where: { concertId },
+    });
+  }
 }

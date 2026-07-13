@@ -31,6 +31,17 @@ Rel(ticketbox, brand_csv, "Định kỳ tải file<br/>danh sách khách mời")
 UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
 ```
 
+### Kiến trúc tổng thể (Overall Architecture)
+
+TicketBox được xây dựng theo kiến trúc **Modular Monolith** dựa trên NestJS.
+- **Client Tier**: Bao gồm Web App (khán giả, admin) và PWA Scanner (nhân viên soát vé offline).
+- **API Tier**: Cung cấp các RESTful API. Hệ thống được chia thành các module độc lập theo domain (Auth, Concerts, Orders, Payment, Notifications, Guests).
+- **Data & Background Tier**: PostgreSQL đóng vai trò lưu trữ chính (Single Source of Truth). Redis được sử dụng cho Caching, Rate Limiting, Idempotency và làm Message Broker cho BullMQ. Các Background Worker xử lý gửi thông báo, import CSV, quét đơn hàng hết hạn.
+- **Giao tiếp**: 
+  - Các module trong hệ thống gọi nhau qua service layer trực tiếp hoặc thông qua Event Emitter nội bộ (ví dụ: `order.paid` kích hoạt Notification).
+  - Giao tiếp với Client qua HTTP REST.
+  - Giao tiếp với Background Worker qua Redis Queue (BullMQ).
+
 ### 1.1. C4 Model - Level 2: Container Diagram
 
 ```mermaid
@@ -264,28 +275,66 @@ Full behaviour, error cases, and acceptance criteria: [specs/auth.md](specs/auth
 
 ---
 
-## Mechanisms (Person B)
+## 4. Failure Isolation (Xử lý sự cố)
 
-### 2. Rate Limiting
+Hệ thống được thiết kế để cô lập lỗi, đảm bảo khi một phần tử gặp sự cố, các phần tử khác vẫn duy trì hoạt động tối đa có thể:
+
+| Thành phần sự cố | Tác động đến hệ thống | Cơ chế dự phòng / Phục hồi |
+|---|---|---|
+| **Cổng thanh toán (VNPAY)** chậm/chết | - Không thể thanh toán vé ngay lập tức. | - **Circuit Breaker** mở, chặn các gọi API dư thừa (trả về 503). Đơn hàng giữ trạng thái PENDING. Người dùng vẫn xem được danh sách Concert bình thường. |
+| **Redis** sập | - Tính năng Rate Limit, Caching, BullMQ ngừng hoạt động. | - API trả về dữ liệu trực tiếp từ PostgreSQL (nếu logic Cache có dự phòng fallback) hoặc báo lỗi ở các tính năng phụ thuộc. Cần có alert để khởi động lại Redis. |
+| **PostgreSQL** sập | - Toàn bộ chức năng Đọc/Ghi dữ liệu lõi ngừng hoạt động. | - Trả về lỗi 500/503. Scanner App vẫn có thể quét vé **Offline** nếu đã tải trước dữ liệu, sẽ chờ DB sống lại để đồng bộ (Sync). |
+| **Background Worker** chết | - Thông báo (Email, In-App), Import CSV bị trễ. | - Các Job vẫn nằm an toàn trong hàng đợi Redis (BullMQ). Khi Worker khởi động lại, nó sẽ tiếp tục xử lý các Job chưa hoàn thành. |
+| **Mất kết nối Internet tại cổng** | - Scanner không gọi được API lên Backend. | - Ứng dụng PWA chuyển sang chế độ **Offline-first**. Lưu lịch sử quét vào IndexedDB và chặn Double-scan cục bộ. |
+
+---
+
+## 5. Architecture Decision Records (ADRs)
+
+### ADR 1: Cấu trúc Modular Monolith thay vì Microservices
+- **Context**: Dự án có thời gian phát triển ngắn, team 3 người.
+- **Decision**: Chọn Modular Monolith với NestJS.
+- **Consequences**: Giảm chi phí deploy, dễ trace bug và giao dịch (transactions), code tập trung. Đánh đổi: Khó scale từng phần riêng biệt.
+
+### ADR 2: Pessimistic Locking (`FOR UPDATE`) thay vì Optimistic Locking
+- **Context**: Bán vé sự kiện thường có lượng truy cập đột biến (Traffic spike) dồn vào cùng một hạng vé, dễ gây race condition và oversell.
+- **Decision**: Sử dụng PostgreSQL `SELECT ... FOR UPDATE` kết hợp Atomic Conditional Decrement.
+- **Consequences**: Đảm bảo 100% không bán quá số lượng vé. Transaction bị lock có thể làm giảm throughput một chút, nhưng an toàn dữ liệu là ưu tiên cao nhất.
+
+### ADR 3: Cơ sở dữ liệu Relational (PostgreSQL) thay vì NoSQL
+- **Context**: Hệ thống bán vé yêu cầu tính nhất quán dữ liệu (ACID) cực kỳ cao giữa Order, Ticket, và Payment.
+- **Decision**: Chọn PostgreSQL.
+- **Consequences**: Đảm bảo toàn vẹn dữ liệu tốt nhất nhờ Foreign Keys, Transactions. Tuy nhiên, schema phải được thiết kế cứng và migrate cẩn thận.
+
+### ADR 4: Sử dụng BullMQ với Redis thay vì Kafka/RabbitMQ
+- **Context**: Cần xử lý các task bất đồng bộ (Gửi thông báo, Hủy đơn hàng hết hạn, Import CSV).
+- **Decision**: Chọn BullMQ chạy trên nền Redis.
+- **Consequences**: Dễ setup vì hệ thống đằng nào cũng dùng Redis cho Caching. Không cần maintain thêm cluster Kafka nặng nề, đủ đáp ứng throughput hiện tại.
+
+---
+
+## 6. Mechanisms (Person B)
+
+### 6.1. Rate Limiting (Mechanism #2)
 
 - **Implementation**: Token Bucket pattern via Redis.
 - **Why**: Protect against traffic spikes (e.g. 80k requests/5m).
 - **ADR**: We chose Redis Token Bucket over memory caching to support horizontal scaling later, and to apply accurate rate limiting per IP/user identifier globally.
 
-### 3. Circuit Breaker
+### 6.2. Circuit Breaker (Mechanism #3)
 
 - **Implementation**: Mock gateway wrapped by a Circuit Breaker middleware.
 - **Why**: Handles payment gateway failure gracefully without blocking concert listing.
 - **ADR**: Selected `opossum` for Node.js circuit breaker. We could have used native try-catch logic but `opossum` implements a robust Open/Half-Open/Closed state machine.
 
-### 7. Caching
-
-- **Implementation**: Cache-aside with Redis.
-- **Why**: DB load reduction for highly concurrent read endpoints (e.g., concert list and detail).
-- **ADR**: Selected Cache-aside over Read-through because of NestJS + Prisma constraints, and because we only need to cache hot data with a relatively short TTL. Explicit invalidation is done upon ticket purchase.
-
-### 4. Idempotency (For Payment)
+### 6.3. Idempotency For Payment (Mechanism #4a)
 
 - **Implementation**: Idempotency-Key header cached in Redis.
 - **Why**: Prevents double-charging if the user or app retries the same payment transaction.
 - **ADR**: Redis TTL-based idempotency was preferred to a pure relational model check due to the speed and efficiency of checking Redis before hitting the payment logic or database.
+
+### 6.4. Caching (Mechanism #7)
+
+- **Implementation**: Cache-aside with Redis.
+- **Why**: DB load reduction for highly concurrent read endpoints (e.g., concert list and detail).
+- **ADR**: Selected Cache-aside over Read-through because of NestJS + Prisma constraints, and because we only need to cache hot data with a relatively short TTL. Explicit invalidation is done upon ticket purchase.
