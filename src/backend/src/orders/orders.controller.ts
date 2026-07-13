@@ -8,6 +8,7 @@ import {
   UseGuards,
   Req,
   BadRequestException,
+  Query,
 } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/roles.guard';
@@ -50,6 +51,23 @@ export class OrdersController {
   @Roles(Role.AUDIENCE)
   async fail(@Param('id') id: string) {
     return this.ordersService.failPayment(id);
+  }
+
+  @Get('vnpay/url/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.AUDIENCE)
+  async getVNPayUrl(@Req() req: any, @Param('id') id: string) {
+    const userId = req.user.userId;
+    const ipAddress = req.ip || req.connection.remoteAddress || '127.0.0.1';
+    return this.ordersService.getVNPayUrl(id, userId, ipAddress);
+  }
+
+  @Get('vnpay/return')
+  async vnpayReturn(@Query() query: any) {
+    // Note: VNPay return URL might be called directly by the user's browser, 
+    // so we handle it without JwtAuthGuard here, or we expect the frontend 
+    // to proxy this call. If frontend proxies, it can pass the query.
+    return this.ordersService.handleVNPayReturn(query);
   }
 
   @Get(':id')

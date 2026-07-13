@@ -18,6 +18,7 @@ export default function ConcertDetail() {
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
   const [issuedTickets, setIssuedTickets] = useState<any[]>([]);
+  const [paymentMethod, setPaymentMethod] = useState<'VNPAY' | 'MOCK'>('VNPAY');
 
   // Hiển thị lỗi từ cổng thanh toán truyền về nếu có và hủy order ngay lập tức để giải phóng vé
   useEffect(() => {
@@ -135,7 +136,16 @@ export default function ConcertDetail() {
       );
 
       const orderId = response.data.id;
-      window.location.href = `http://localhost:4000/pay?orderId=${orderId}&amount=${totalAmount}&concertSlug=${slug}`;
+
+      if (paymentMethod === 'VNPAY') {
+        const vnpayRes = await axios.get(
+          `http://localhost:3000/orders/vnpay/url/${orderId}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        window.location.href = vnpayRes.data.url;
+      } else {
+        window.location.href = `http://localhost:4000/pay?orderId=${orderId}&amount=${totalAmount}&concertSlug=${slug}`;
+      }
     } catch (err: any) {
       const status = err.response?.status;
       if (status === 409) setCheckoutError("Rất tiếc! Số lượng vé bạn chọn vừa bị mua hết (Oversell Protection).");
@@ -159,6 +169,36 @@ export default function ConcertDetail() {
 
   if (loading) return <div style={{ padding: '50px', textAlign: 'center', fontSize: '1.2rem' }}>⏳ Đang tải dữ liệu thực tế...</div>;
   if (!concert) return <div style={{ padding: '50px', textAlign: 'center', color: 'red' }}>Không tìm thấy Concert!</div>;
+
+  // Hiển thị banner hủy concert trước khi render nội dung mua vé
+  if (concert.status === 'CANCELLED') {
+    return (
+      <div style={{ maxWidth: '800px', margin: '40px auto', padding: '20px' }}>
+        <Link to="/" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 'bold' }}>← Quay lại danh sách</Link>
+        <div style={{
+          marginTop: '30px',
+          background: '#fef2f2',
+          border: '2px solid #ef4444',
+          borderRadius: '12px',
+          padding: '40px',
+          textAlign: 'center',
+        }}>
+          <div style={{ fontSize: '4rem', marginBottom: '16px' }}>🚫</div>
+          <h1 style={{ fontSize: '2rem', color: '#b91c1c', marginBottom: '12px' }}>Sự kiện đã bị hủy</h1>
+          <h2 style={{ fontSize: '1.3rem', color: '#374151', marginBottom: '12px' }}>{concert.title}</h2>
+          <p style={{ color: '#6b7280', fontSize: '1rem', marginBottom: '8px' }}>
+            📍 {concert.venue} &nbsp;|&nbsp; ⏰ {new Date(concert.startsAt).toLocaleString('vi-VN')}
+          </p>
+          <p style={{ color: '#dc2626', fontWeight: 600, marginTop: '20px', fontSize: '1rem' }}>
+            Sự kiện này đã bị hủy bởi Ban tổ chức. Vé của bạn (nếu đã mua) sẽ được hoàn tiền trong thời gian sớm nhất.
+          </p>
+          <p style={{ color: '#6b7280', marginTop: '12px', fontSize: '0.9rem' }}>
+            Vui lòng kiểm tra hộp thư <Link to="/notifications" style={{ color: '#2563eb' }}>Thông báo</Link> để biết thêm chi tiết.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (issuedTickets.length > 0) {
     return (
@@ -360,6 +400,33 @@ export default function ConcertDetail() {
                 <span>Tổng tiền:</span>
                 <span style={{ fontWeight: 'bold', color: '#38bdf8' }}>{totalAmount.toLocaleString('vi-VN')} VNĐ</span>
               </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <p style={{ marginBottom: '10px', fontSize: '0.9rem', color: '#94a3b8' }}>Phương thức thanh toán:</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="VNPAY"
+                      checked={paymentMethod === 'VNPAY'}
+                      onChange={() => setPaymentMethod('VNPAY')}
+                    />
+                    <span style={{ color: paymentMethod === 'VNPAY' ? 'white' : '#94a3b8' }}>Thẻ nội địa - VNPay (Demo)</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="MOCK"
+                      checked={paymentMethod === 'MOCK'}
+                      onChange={() => setPaymentMethod('MOCK')}
+                    />
+                    <span style={{ color: paymentMethod === 'MOCK' ? 'white' : '#94a3b8' }}>Thẻ quốc tế - Mock Gateway</span>
+                  </label>
+                </div>
+              </div>
+
               <button
                 onClick={handleCheckout}
                 disabled={totalTickets === 0 || isCheckingOut}

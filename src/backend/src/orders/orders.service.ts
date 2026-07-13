@@ -19,6 +19,7 @@ import { randomUUID } from 'crypto';
 import { CacheService } from 'src/common/cache/cache.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { VNPayService } from 'src/payment/vnpay.service';
 
 @Injectable()
 export class OrdersService implements OnModuleInit {
@@ -27,6 +28,7 @@ export class OrdersService implements OnModuleInit {
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     private readonly cacheService: CacheService,
     private readonly payment: PaymentGatewayService,
+    private readonly vnpay: VNPayService,
     private readonly eventEmitter: EventEmitter2,
     @InjectQueue('orders') private readonly ordersQueue: Queue,
   ) { }
@@ -265,7 +267,59 @@ export class OrdersService implements OnModuleInit {
   }
 
   /**
+   * Called by external webhook/callback (like VNPay) when payment is successful.
+   * Flips status to PAID and issues tickets idempotently.
+   */
+  async fulfillOrder(orderId: string) {
+    const paid = await this.prisma.$transaction(async (tx) => {
+      const flip = await tx.order.updateMany({
+        where: { id: orderId, status: OrderStatus.PENDING },
+        data: { status: OrderStatus.PAID },
+      });
+
+      if (flip.count === 0) {
+        return tx.order.findUnique({
+          where: { id: orderId },
+          include: {
+            tickets: { include: { ticketType: true } },
+            items: { include: { ticketType: true } },
+            concert: true,
+          },
+        });
+      }
+
+      const items = await tx.orderItem.findMany({ where: { orderId } });
+      for (const it of items) {
+        for (let i = 0; i < it.quantity; i++) {
+          await tx.ticket.create({
+            data: {
+              orderId,
+              ticketTypeId: it.ticketTypeId,
+              qrCode: randomUUID(),
+            },
+          });
+        }
+      }
+
+      return tx.order.findUnique({
+        where: { id: orderId },
+        include: {
+          tickets: { include: { ticketType: true } },
+          items: { include: { ticketType: true } },
+          concert: true,
+        },
+      });
+    });
+
+    if (paid) {
+      this.eventEmitter.emit('order.paid', paid);
+    }
+    return paid;
+  }
+
+  /**
    * Flip a PENDING order to FAILED and return its reserved stock — exactly once.
+
    * The guarded `updateMany` is the idempotency latch: only the caller that flips
    * the row (count === 1) releases stock; a duplicate/lost race flips 0 rows and
    * skips the release, so `remainingQty` is incremented exactly once.
@@ -305,6 +359,59 @@ export class OrdersService implements OnModuleInit {
     if (order.concert?.slug) {
       await this.cacheService.invalidateConcert(order.concert.slug);
     }
+
+    return result;
+  }
+
+  // ─── VNPay Methods ────────────────────────────────────────────────────────
+  
+  async getVNPayUrl(orderId: string, userId: string, ipAddress: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { concert: true },
+    });
+
+    if (!order) {
+      throw new NotFoundException(`Order with ID ${orderId} not found`);
+    }
+    if (order.userId !== userId) {
+      throw new BadRequestException('Access denied to this order');
+    }
+    if (order.status !== OrderStatus.PENDING) {
+      throw new BadRequestException(`Order is ${order.status}, cannot pay`);
+    }
+
+    const orderInfo = `Thanh toan ve concert ${order.concert.title || orderId}`;
+    const url = this.vnpay.createPaymentUrl(order.id, order.totalAmount, orderInfo, ipAddress);
+    return { url };
+  }
+
+  async handleVNPayReturn(query: any) {
+    const result = this.vnpay.verifyReturnUrl(query);
+    
+    if (!result.success) {
+      // If payment failed (e.g., user cancelled), we don't automatically fail the order 
+      // because they might retry. We just return the result.
+      return result;
+    }
+
+    const orderId = result.data.orderId;
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    
+    if (!order) {
+      return { success: false, code: '01', message: 'Order not found' };
+    }
+
+    if (order.status === OrderStatus.PAID) {
+      return { success: true, code: '00', message: 'Order already paid' };
+    }
+
+    if (order.status !== OrderStatus.PENDING) {
+      return { success: false, code: '02', message: `Order is ${order.status}` };
+    }
+
+    // fulfill the order (flip status and issue tickets)
+    await this.fulfillOrder(orderId);
 
     return result;
   }

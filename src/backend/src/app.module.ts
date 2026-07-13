@@ -14,6 +14,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { NotificationsModule } from './notifications/notifications.module';
 import { GuestsModule } from './guests/guests.module';
 import { AiBioModule } from './ai-bio/ai-bio.module';
+import { CheckinModule } from './checkin/checkin.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { AiBioModule } from './ai-bio/ai-bio.module';
     NotificationsModule,
     GuestsModule,
     AiBioModule,
+    CheckinModule
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -8,11 +8,7 @@ export default function Notifications() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Chỉ Khán giả mới được vào trang này
-  if (role !== 'AUDIENCE') {
-    return <Navigate to="/" replace />;
-  }
-
+  // ⚠️ Hooks phải đặt TRƯỚC mọi early return (Rules of Hooks)
   useEffect(() => {
     const fetchNotifications = async () => {
       try {
@@ -48,6 +44,11 @@ export default function Notifications() {
     }
   }, [token]);
 
+  // Early return SAU hooks
+  if (role !== 'AUDIENCE') {
+    return <Navigate to="/" replace />;
+  }
+
   const getNotificationDetails = (noti: any) => {
     let title = noti.payload?.title;
     let message = noti.payload?.message;
@@ -61,6 +62,11 @@ export default function Notifications() {
       title = noti.payload?.title || 'Nhắc nhở sự kiện sắp diễn ra ⏰';
       message = noti.payload?.message || 'Concert của bạn sẽ bắt đầu trong vòng 24 giờ tới. Hãy chuẩn bị sẵn vé QR!';
       emoji = '⏰';
+    } else if (noti.type === 'CONCERT_CANCELLED') {
+      const concertTitle = noti.payload?.concertTitle || 'concert';
+      title = `Sự kiện "${concertTitle}" đã bị hủy ❌`;
+      message = noti.payload?.message || `Rất tiếc, sự kiện "${concertTitle}" đã bị hủy. Vé của bạn sẽ được hoàn tiền trong thời gian sớm nhất.`;
+      emoji = '🚫';
     } else if (noti.type === 'WARNING') {
       title = title || 'Cảnh báo hệ thống';
       emoji = '⚠️';
