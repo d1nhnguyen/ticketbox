@@ -45,6 +45,9 @@ export default function Notifications() {
   }, [token]);
 
   // Early return SAU hooks
+  if (!role) {
+    return null; // ProtectedRoute will handle the redirect to /login
+  }
   if (role !== 'AUDIENCE') {
     return <Navigate to="/" replace />;
   }

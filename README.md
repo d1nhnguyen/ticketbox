@@ -200,9 +200,49 @@ A genuine pass looks like this:
 If you instead see it start from `remainingQty = 0` and pass with `0` sold, that's a
 **false pass** — the stock wasn't reset. Re-run Step 1 with `FORCE_SEED=1`.
 
+### 8.1 Other Load Tests
+You can run the following test scripts similarly:
+- **Rate Limit**: `node scripts/load-test/rate-limit.js`
+- **Circuit Breaker**: `node scripts/load-test/circuit-breaker.js`
+- **Per-User Limit**: `node scripts/load-test/per-user-limit.js`
+
 ---
 
-## 9. Running the backend without Docker (optional)
+## 9. AI Artist Bio Setup
+
+To enable the AI Artist Bio feature:
+1. Open `src/backend/.env`.
+2. Set `AI_PROVIDER=gemini` (or `anthropic`, `openai`).
+3. Set the corresponding API key, e.g., `GEMINI_API_KEY=your_key_here`.
+4. If no key is set or the feature fails, the system safely falls back to a placeholder bio.
+
+---
+
+## 10. CSV Import Demo
+
+To test the VIP Guest CSV upload:
+1. Log in as **Organizer** (`organizer@ticketbox.dev`).
+2. Go to the Admin Dashboard and select a Concert.
+3. In the "Upload Khách mời (CSV)" tab, use the sample files in `src/backend/data/sample-csv/`:
+   - `valid-guests.csv`: Imports successfully.
+   - `duplicate-guests.csv`: Tests the checksum and duplicate rejection.
+   - `invalid-format.csv`: Tests validation errors.
+
+---
+
+## 11. Offline Check-in Demo
+
+To test the PWA Scanner's offline capability:
+1. Open the Scanner app (`http://localhost:5174`) and log in as **Scanner**.
+2. Go to the "Tải dữ liệu" tab and sync the latest tickets for a concert.
+3. **Turn off your network** (in DevTools -> Network -> Offline).
+4. Scan a ticket QR code (or use the VIP Search tab). The check-in will be recorded locally in IndexedDB.
+5. Try scanning the same ticket again — you'll be blocked (Local Double-scan block).
+6. **Turn the network back on**. The app will automatically sync the offline logs to the Backend.
+
+---
+
+## 12. Running the backend without Docker (optional)
 
 If you prefer to run the API on your host (you still need Postgres + Redis from Docker):
 
@@ -219,7 +259,7 @@ The host `.env` already points `DATABASE_URL` / `REDIS_URL` at `localhost`.
 
 ---
 
-## 10. Troubleshooting
+## 13. Troubleshooting
 
 | Symptom | Fix |
 | ------- | --- |
@@ -231,7 +271,7 @@ The host `.env` already points `DATABASE_URL` / `REDIS_URL` at `localhost`.
 
 ---
 
-## 11. Project layout
+## 14. Project layout
 
 ```
 ticketbox/
