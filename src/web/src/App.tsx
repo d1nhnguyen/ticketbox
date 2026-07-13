@@ -14,6 +14,7 @@ import AiBioUpload from './pages/admin/AiBioUpload';
 import CsvUpload from './pages/admin/CsvUpload';
 import AdminConcertDetail from './pages/admin/AdminConcertDetail';
 import Notifications from './pages/Notifications';
+import VNPayReturn from './pages/VNPayReturn';
 
 export default function App() {
   return (
@@ -29,6 +30,7 @@ export default function App() {
             <Route path="/dashboard" element={<AudienceDashboard />} />
 
             <Route path="/notifications" element={<Notifications />} />
+            <Route path="/vnpay-return" element={<VNPayReturn />} />
 
             {/* Tuyến đường được bảo vệ cho Admin */}
             <Route element={<ProtectedRoute allowedRoles={['ORGANIZER']} />}>
