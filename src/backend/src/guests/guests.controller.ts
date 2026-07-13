@@ -32,4 +32,9 @@ export class GuestsController {
   async getBatches(@Param('concertId') concertId: string) {
     return this.guestsService.getBatches(concertId);
   }
+
+  @Get('list')
+  async getList(@Param('concertId') concertId: string) {
+    return this.guestsService.getList(concertId);
+  }
 }
