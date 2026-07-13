@@ -160,6 +160,36 @@ export default function ConcertDetail() {
   if (loading) return <div style={{ padding: '50px', textAlign: 'center', fontSize: '1.2rem' }}>⏳ Đang tải dữ liệu thực tế...</div>;
   if (!concert) return <div style={{ padding: '50px', textAlign: 'center', color: 'red' }}>Không tìm thấy Concert!</div>;
 
+  // Hiển thị banner hủy concert trước khi render nội dung mua vé
+  if (concert.status === 'CANCELLED') {
+    return (
+      <div style={{ maxWidth: '800px', margin: '40px auto', padding: '20px' }}>
+        <Link to="/" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 'bold' }}>← Quay lại danh sách</Link>
+        <div style={{
+          marginTop: '30px',
+          background: '#fef2f2',
+          border: '2px solid #ef4444',
+          borderRadius: '12px',
+          padding: '40px',
+          textAlign: 'center',
+        }}>
+          <div style={{ fontSize: '4rem', marginBottom: '16px' }}>🚫</div>
+          <h1 style={{ fontSize: '2rem', color: '#b91c1c', marginBottom: '12px' }}>Sự kiện đã bị hủy</h1>
+          <h2 style={{ fontSize: '1.3rem', color: '#374151', marginBottom: '12px' }}>{concert.title}</h2>
+          <p style={{ color: '#6b7280', fontSize: '1rem', marginBottom: '8px' }}>
+            📍 {concert.venue} &nbsp;|&nbsp; ⏰ {new Date(concert.startsAt).toLocaleString('vi-VN')}
+          </p>
+          <p style={{ color: '#dc2626', fontWeight: 600, marginTop: '20px', fontSize: '1rem' }}>
+            Sự kiện này đã bị hủy bởi Ban tổ chức. Vé của bạn (nếu đã mua) sẽ được hoàn tiền trong thời gian sớm nhất.
+          </p>
+          <p style={{ color: '#6b7280', marginTop: '12px', fontSize: '0.9rem' }}>
+            Vui lòng kiểm tra hộp thư <Link to="/notifications" style={{ color: '#2563eb' }}>Thông báo</Link> để biết thêm chi tiết.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (issuedTickets.length > 0) {
     return (
       <div style={{ maxWidth: '700px', margin: '40px auto', padding: '20px', textAlign: 'center' }}>
