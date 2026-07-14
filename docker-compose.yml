@@ -72,6 +72,7 @@ services:
       MAIL_PORT: "1025"
       MAIL_SECURE: "false"
       MAIL_FROM: "TicketBox <no-reply@ticketbox.local>"
+      CSV_INBOX_DIR: /data/inbox
     volumes:
       - ./data:/data
     depends_on:

@@ -143,3 +143,13 @@ vite.config.ts.timestamp-*
 .vite/
 
 # requirements.md
+
+# CSV inbox runtime state (keep the folder scaffolding, ignore every dropped/moved file type)
+data/inbox/*
+!data/inbox/.gitkeep
+!data/inbox/processed/
+!data/inbox/failed/
+data/inbox/processed/*
+data/inbox/failed/*
+!data/inbox/processed/.gitkeep
+!data/inbox/failed/.gitkeep

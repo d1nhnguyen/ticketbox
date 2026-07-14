@@ -18,28 +18,37 @@ export class GuestsService {
   ) {}
 
   async uploadCsv(concertId: string, file: Express.Multer.File) {
-    // 1. Verify concert
     const concert = await this.prisma.concert.findUnique({ where: { id: concertId } });
     if (!concert) {
       throw new NotFoundException(`Concert ${concertId} not found`);
     }
+    return this.ingestBuffer(concertId, file.originalname, file.buffer);
+  }
 
-    // 2. SHA-256 Checksum
-    const checksum = createHash('sha256').update(file.buffer).digest('hex');
+  /**
+   * Shared ingest core reused by both the interactive upload endpoint and the
+   * scheduled inbox poller — checksum dedup, batch bookkeeping, and BullMQ
+   * enqueue are identical regardless of where the CSV bytes came from.
+   */
+  async ingestBuffer(concertId: string, filename: string, buffer: Buffer) {
+    // 1. SHA-256 Checksum
+    const checksum = createHash('sha256').update(buffer).digest('hex');
 
     // Pre-check to avoid TOCTOU partially
-    const existingBatch = await this.prisma.csvImportBatch.findUnique({ where: { checksum } });
+    const existingBatch = await this.prisma.csvImportBatch.findUnique({
+      where: { concertId_checksum: { concertId, checksum } },
+    });
     if (existingBatch) {
       throw new ConflictException('File already imported');
     }
 
-    // 3. Create CsvImportBatch and save file
+    // 2. Create CsvImportBatch and save file
     let batch;
     try {
       batch = await this.prisma.csvImportBatch.create({
         data: {
           concertId,
-          filename: file.originalname,
+          filename,
           checksum,
           status: 'PROCESSING',
           rowsTotal: 0,
@@ -55,18 +64,37 @@ export class GuestsService {
     }
 
     const uploadsDir = path.join(process.cwd(), 'uploads');
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
-    }
     const filePath = path.join(uploadsDir, `${batch.id}.csv`);
-    fs.writeFileSync(filePath, file.buffer);
 
-    // 4. Enqueue BullMQ job
-    await this.guestsQueue.add('guests.import', {
-      batchId: batch.id,
-      concertId,
-      filePath,
-    }, { attempts: 3, backoff: { type: 'exponential', delay: 1000 } });
+    try {
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+      fs.writeFileSync(filePath, buffer);
+
+      // 3. Enqueue BullMQ job
+      await this.guestsQueue.add('guests.import', {
+        batchId: batch.id,
+        concertId,
+        filePath,
+      }, { attempts: 3, backoff: { type: 'exponential', delay: 1000 } });
+    } catch (error) {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+      try {
+        await this.prisma.csvImportBatch.update({
+          where: { id: batch.id },
+          data: { status: 'FAILED' },
+        });
+      } catch (updateError) {
+        this.logger.error(
+          `Could not mark batch ${batch.id} as FAILED after enqueue error`,
+          updateError,
+        );
+      }
+      throw error;
+    }
 
     this.logger.log(`Accepted CSV for concert ${concertId}, batch ${batch.id}`);
 

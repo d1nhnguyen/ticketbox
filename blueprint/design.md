@@ -310,6 +310,7 @@ Hệ thống được thiết kế để cô lập lỗi, đảm bảo khi một
 - **Context**: Cần xử lý các task bất đồng bộ (Gửi thông báo, Hủy đơn hàng hết hạn, Import CSV).
 - **Decision**: Chọn BullMQ chạy trên nền Redis.
 - **Consequences**: Dễ setup vì hệ thống đằng nào cũng dùng Redis cho Caching. Không cần maintain thêm cluster Kafka nặng nề, đủ đáp ứng throughput hiện tại.
+- **Cập nhật (scheduled CSV inbox)**: Import CSV giờ có hai lối vào cùng đổ vào một pipeline BullMQ (`guests` queue, xem `specs/csv-ingestion.md`): (1) upload thủ công từ Admin UI, và (2) `InboxPollerService` (`@Cron` mỗi 10s, `@nestjs/schedule`) quét thư mục mount `data/inbox/` để đáp ứng yêu cầu "định kỳ nhập". Cả hai gọi chung `GuestsService.ingestBuffer`, nên `GuestsProcessor` (worker) không đổi.
 
 ---
 

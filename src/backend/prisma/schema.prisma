@@ -185,7 +185,7 @@ model CsvImportBatch {
   id         String       @id @default(uuid())
   concertId  String
   filename   String
-  checksum   String       @unique
+  checksum   String
   status     ImportStatus @default(PROCESSING)
   rowsTotal  Int
   rowsOk     Int
@@ -193,6 +193,8 @@ model CsvImportBatch {
   createdAt  DateTime     @default(now())
 
   concert Concert @relation(fields: [concertId], references: [id], onDelete: Cascade)
+
+  @@unique([concertId, checksum])
 }
 
 model Notification {

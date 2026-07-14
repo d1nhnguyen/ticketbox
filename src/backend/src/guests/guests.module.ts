@@ -4,6 +4,7 @@ import { GuestsController } from './guests.controller';
 import { GuestVerificationController } from './guest-verification.controller';
 import { GuestsService } from './guests.service';
 import { GuestsProcessor } from './guests.processor';
+import { InboxPollerService } from './inbox-poller.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 @Module({
@@ -13,7 +14,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
     }),
   ],
   controllers: [GuestsController, GuestVerificationController],
-  providers: [GuestsService, GuestsProcessor, PrismaService],
+  providers: [GuestsService, GuestsProcessor, InboxPollerService, PrismaService],
   exports: [GuestsService],
 })
 export class GuestsModule {}

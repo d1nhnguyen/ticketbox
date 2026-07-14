@@ -25,9 +25,20 @@ export class GuestsProcessor extends WorkerHost {
       const seenDocIds = new Set<string>();
       const seenNames = new Set<string>();
 
-      await new Promise((resolve, reject) => {
-        fs.createReadStream(filePath, { encoding: 'utf-8' })
-          .pipe(csvParser())
+      await new Promise<void>((resolve, reject) => {
+        const input = fs.createReadStream(filePath, { encoding: 'utf-8' });
+        const parser = csvParser();
+
+        input.on('error', reject);
+        parser
+          .on('headers', (headers: string[]) => {
+            const normalized = new Set(headers.map((header) => header.trim()));
+            if (!normalized.has('fullName') || !normalized.has('zone')) {
+              parser.destroy(
+                new Error('Invalid CSV headers: fullName and zone are required'),
+              );
+            }
+          })
           .on('data', (row) => {
             rowsTotal++;
             const fullName = row.fullName?.trim();
@@ -60,6 +71,8 @@ export class GuestsProcessor extends WorkerHost {
           })
           .on('end', resolve)
           .on('error', reject);
+
+        input.pipe(parser);
       });
 
       // Database deduplication
@@ -146,7 +159,7 @@ export class GuestsProcessor extends WorkerHost {
 
   @OnWorkerEvent('failed')
   async onFailed(job: Job, error: Error) {
-    if (job.attemptsMade === job.opts.attempts) {
+    if (job.attemptsMade >= (job.opts.attempts ?? 1)) {
       const { batchId, filePath } = job.data;
       this.logger.error(`Batch ${batchId} terminal failure: ${error.message}`);
       

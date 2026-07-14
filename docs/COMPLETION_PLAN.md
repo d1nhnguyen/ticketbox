@@ -45,7 +45,7 @@ Rubric vẫn yêu cầu **thiết kế và chứng minh cơ chế** cho tải 80
 | BP05 | `DONE` | `blueprint/design.md` §2 và Prisma schema. | Đối chiếu ERD với schema cuối. |
 | BP06 | `PARTIAL` | `specs/purchase.md`, `specs/payment.md`, `specs/notifications.md`. | Thêm một sequence end-to-end từ click mua đến QR/app/email, gồm timeout, fail, expiry và email retry. |
 | BP07 | `DONE` | `specs/checkin.md` có preload, IndexedDB, offline scan, sync và two-device conflict. | Gắn screenshot/video acceptance sau khi chạy thật. |
-| BP08 | `MISSING` | Spec/code hiện chỉ upload-triggered. | Đổi ADR và sơ đồ sang scheduled inbox; mô tả valid/duplicate/row-error/malformed/processed/failed. |
+| BP08 | `DONE` | `specs/csv-ingestion.md` viết lại ADR (scheduled inbox + upload dùng chung pipeline), main flow, error scenarios, acceptance criteria; `design.md` ADR 4 cập nhật. `InboxPollerService` (`@Cron` 10s) triển khai thật ngày 2026-07-14. | Render sơ đồ high-level cập nhật CSV inbox trong BP04 (§4.7). |
 | BP09 | `DONE` | `design.md` §3 và guards/decorators theo ba role. | Chạy role matrix làm evidence. |
 | BP10 | `PARTIAL` | Redis token bucket và load-test script đã có. | Ghi capacity reasoning 80.000/5 phút, 70% phút đầu (~933 req/s), key strategy và bot-fairness/degradation `429`. |
 | BP11 | `PARTIAL` | Opossum circuit breaker và failure section đã có. | Mô tả rõ browsing vẫn chạy, payment trả `503`, order retry được và hard failure hoàn kho đúng một lần. |
@@ -67,7 +67,7 @@ Rubric vẫn yêu cầu **thiết kế và chứng minh cơ chế** cho tải 80
 | IM07 | `PARTIAL` | Scanner PWA có camera QR và xác nhận tại cổng. | Xác nhận rubric chấp nhận PWA là mobile app và quay demo trên mobile viewport/device. |
 | IM08 | `PARTIAL` | IndexedDB queues, service worker, reconnect sync và atomic double-scan guard đã có. | Chạy offline/reload/two-profile acceptance. |
 | IM09 | `PARTIAL` | PDF parsing, cleaning, ba provider và fallback đã có. | Chạy ít nhất một provider thật, không lộ key. |
-| IM10 | `MISSING` | Upload CSV và BullMQ worker đã có nhưng không định kỳ. | Cài scheduled inbox cùng processed/failed handling. |
+| IM10 | `DONE` | Upload CSV, BullMQ worker và `InboxPollerService` (poll `/data/inbox` mỗi 10s, sweep `processed/`/`failed/`, dùng chung `ingestBuffer` với upload) đã chạy thật và verify ngày 2026-07-14 (valid/duplicate/row-error/malformed/unknown-slug). | Gắn evidence vào video demo. |
 | IM11 | `PARTIAL` | Atomic stock decrement và oversell script đã có. | Chạy demo, chứng minh success ≤ stock và remaining không âm. |
 | IM12 | `PARTIAL` | Global Redis token bucket và route-specific limits đã có. | Bổ sung bot-fairness/capacity reasoning và demo `429`. |
 | IM13 | `PARTIAL` | Circuit breaker/fallback `503` đã cài thật. | Demo OPEN/HALF_OPEN/CLOSED và browsing không bị ảnh hưởng. |
@@ -83,13 +83,13 @@ TicketBox được xem là hoàn thành khi:
 
 - [ ] Một người mới có thể chạy hệ thống theo README và thấy dữ liệu seed.
 - [ ] Ba vai trò đăng nhập và chỉ dùng đúng chức năng của mình.
-- [ ] Audience xem concert, nghệ sĩ, sơ đồ SVG từ seed, số vé; mua vé và nhận QR.
+- [x] Audience xem concert, nghệ sĩ, sơ đồ SVG từ seed, số vé; mua vé và nhận QR.
 - [ ] Organizer quản lý concert/ticket type, hủy concert và xem doanh thu đã thanh toán.
 - [x] Purchase notification xuất hiện trong app và email có e-ticket.
 - [ ] Reminder trước concert khoảng 24 giờ hoạt động.
 - [ ] Scanner tải dữ liệu, scan offline và đồng bộ lại; một vé không được accepted hai lần.
 - [ ] AI bio xử lý PDF và đã được demo ít nhất một lần với provider thật.
-- [ ] CSV guest list được nhập định kỳ, xử lý file lỗi và dữ liệu trùng.
+- [x] CSV guest list được nhập định kỳ, xử lý file lỗi và dữ liệu trùng.
 - [ ] Bảy vấn đề kỹ thuật trong đề có code thật và demo/bằng chứng quy mô phù hợp.
 - [ ] Toàn bộ BP01–BP15 và IM01–IM18 đạt `DONE` hoặc có ghi chú chấp nhận rõ cho mục khuyến nghị.
 - [ ] Blueprint, source/data/README và video đáp ứng cấu trúc nộp bài.
@@ -109,7 +109,7 @@ TicketBox được xem là hoàn thành khi:
 - [x] Mailpit local, SMTP notification retry và email purchase có QR e-ticket cho từng vé.
 - [x] Organizer concert/ticket CRUD, cancellation và paid stats API.
 - [x] Dashboard/AdminConcertDetail dùng paid stats API cho doanh thu và số vé đã bán.
-- [x] CSV upload, checksum dedup, row-level validation và BullMQ worker.
+- [x] CSV upload, checksum dedup, row-level validation, BullMQ worker và scheduled inbox poller (`InboxPollerService`, `data/inbox/` → `processed/`/`failed/`).
 - [x] PDF extraction, AI provider selection và fallback.
 - [x] Scanner login, real pre-download, IndexedDB queues, offline sync và server double-scan guard.
 - [x] Docker Compose cho Postgres, Redis, Mailpit, backend, mock gateway, web và scanner; full build 7 service đã healthy.
@@ -120,9 +120,8 @@ TicketBox được xem là hoàn thành khi:
 | Hạng mục | Loại | Trạng thái |
 |---|---|---|
 | Manual browser scanner journey | `MUST` | Code có, chưa chạy đủ offline/reload/two-device. |
-| Scheduled CSV ingestion | `MUST` | Hiện chỉ có upload thủ công. |
 | Real AI demonstration | `MUST` | Code provider có; cần key và bằng chứng một lần chạy thật. |
-| Blueprint BP04/BP06/BP08/BP10/BP11 | `MUST` | Cần bổ sung high-level diagram, purchase E2E, scheduled CSV, capacity reasoning và graceful degradation. |
+| Blueprint BP04/BP06/BP10/BP11 | `MUST` | Cần bổ sung high-level diagram, purchase E2E, capacity reasoning và graceful degradation. |
 | VNPay currency validation | `SHOULD` | Optional path còn 1 unit test fail vì currency check đang bị tắt; sửa trước khi chốt full test. |
 | Technical-mechanism demo | `MUST` | Scripts phần lớn có; cần chạy và lưu output gọn. |
 | README/blueprint consistency | `MUST` | Cần một lượt đối chiếu cuối. |
@@ -174,18 +173,21 @@ Không cần delivery dashboard, exactly-once email hoặc SMTP production audit
 
 **Hoàn thành khi:** PENDING làm giảm availability nhưng không tăng doanh thu; confirm tăng doanh thu đúng một lần; fail/expiry không được tính.
 
-## 4.4 Scheduled CSV guest ingestion (`MUST`)
+## 4.4 Scheduled CSV guest ingestion (`MUST`) — `DONE` (2026-07-14)
 
-Đề yêu cầu “định kỳ nhập” CSV, nên upload-only chưa đủ.
+Đề yêu cầu "định kỳ nhập" CSV, nên upload-only chưa đủ.
 
-1. Mount một inbox, ví dụ `/data/inbox`.
-2. Cron/BullMQ poll định kỳ và đưa file mới vào pipeline CSV hiện có.
-3. Dùng checksum hiện có để bỏ qua nội dung trùng.
-4. File có row lỗi vẫn nhập row hợp lệ.
-5. File malformed không làm worker/backend crash.
-6. Di chuyển file đã xử lý sang `processed/` hoặc `failed/` để demo được kết quả.
+- [x] Mount một inbox tại `/data/inbox` (`docker-compose.yml` bind-mount `./data:/data` đã có sẵn; thêm `CSV_INBOX_DIR=/data/inbox`).
+- [x] `InboxPollerService` (`@Cron(EVERY_10_SECONDS)`, module `guests`) poll định kỳ và đưa file mới vào pipeline CSV hiện có qua `GuestsService.ingestBuffer` (core dùng chung với endpoint upload, `GuestsProcessor` không đổi).
+- [x] Dùng composite checksum (`@@unique([concertId, checksum])`) để bỏ qua nội dung trùng trong cùng concert — file trùng nội dung được sweep vào `processed/`, nhưng cùng nội dung vẫn có thể nhập cho concert khác.
+- [x] File có row lỗi vẫn nhập row hợp lệ (`rowsFailed` tăng riêng, không chặn `rowsOk`).
+- [x] File malformed/sai schema không làm worker/backend crash — worker bắt buộc header `fullName` và `zone`, retry BullMQ rồi đánh dấu batch `FAILED`; poller sweep file vào `failed/`.
+- [x] Lỗi ghi temp file/enqueue không để batch treo `PROCESSING`: temp file được dọn và batch được chuyển sang `FAILED` trước khi trả lỗi.
+- [x] Di chuyển file đã xử lý sang `processed/` (batch SUCCESS) hoặc `failed/` (batch FAILED, sai đuôi file, hoặc slug concert không tồn tại) để demo được kết quả.
+- [x] Cập nhật `blueprint/specs/csv-ingestion.md` (ADR + main flow + error scenarios + acceptance criteria) và `blueprint/design.md` ADR 4 (BP08).
+- [x] 15 unit tests cho scheduled ingestion: 10 poller cases, 3 shared-ingest cases (composite dedup + duplicate + enqueue rollback), 2 processor cases (malformed header + terminal failure cleanup).
 
-**Hoàn thành khi:** copy file vào inbox mà không gọi upload API vẫn tạo guest list; duplicate và malformed file được xử lý an toàn.
+**Hoàn thành khi:** copy file vào inbox mà không gọi upload API vẫn tạo guest list; duplicate và malformed file được xử lý an toàn. Đã verify trực tiếp qua Docker (`docker compose logs -f backend`): `guests-valid.csv` → 5/5 row nhập, sweep `processed/`; copy trùng nội dung → sweep `processed/` không tạo batch mới, endpoint upload cùng nội dung trả `409`; `guests-with-errors.csv` → 3 row hợp lệ nhập, 3 row lỗi bị bỏ qua; slug không tồn tại và file `.txt` → sweep `failed/`; file thiếu header bắt buộc → retry đủ 3 lần, batch `FAILED`, sweep `failed/`, backend vẫn healthy. Enqueue failure có unit test xác nhận batch được chuyển sang `FAILED` và temp file được dọn, không còn batch `PROCESSING` bị treo.
 
 Không cần distributed file watcher hoặc object storage.
 
@@ -219,7 +221,7 @@ Rubric IM01/IM17 yêu cầu seed không chỉ có concert/ticket/giá mà còn c
 
 1. **BP04:** sửa high-level diagram để có web/PWA/API/DB/Redis/worker cùng payment, AI/PDF, scheduled CSV inbox và offline sync.
 2. **BP06:** thêm sequence mua vé end-to-end đến QR, in-app và email; thể hiện fail/timeout/expiry/retry.
-3. **BP08:** thay ADR upload-only bằng scheduled inbox flow khớp implementation IM10.
+3. ~~**BP08:** thay ADR upload-only bằng scheduled inbox flow khớp implementation IM10~~ — done 2026-07-14 (§4.4, `blueprint/specs/csv-ingestion.md`).
 4. **BP10:** ghi rõ 80.000/5 phút, 70% phút đầu (~933 req/s), token bucket key strategy, bot-fairness và hành vi `429`.
 5. **BP11:** ghi rõ graceful degradation: browsing độc lập, payment `503` khi breaker open, order retry được và hard failure hoàn kho đúng một lần.
 6. Render toàn bộ Mermaid/C4 và kiểm tra link/spec không lỗi.
@@ -277,7 +279,7 @@ Theo `requirements.md` §7:
 
 ## 5. Thứ tự thực hiện đề xuất
 
-1. Scheduled CSV inbox (`BP08`, `IM10`).
+1. ~~Scheduled CSV inbox (`BP08`, `IM10`)~~ — done 2026-07-14 (§4.4).
 2. ~~Seed artist + `seatMapSvg` (`IM01`, `IM17`)~~ — done 2026-07-14 (§4.5).
 3. Hoàn thiện high-level/purchase/traffic/graceful-degradation Blueprint (`BP04`, `BP06`, `BP10`, `BP11`).
 4. Manual scanner acceptance (`IM07`, `IM08`).
