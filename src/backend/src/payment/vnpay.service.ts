@@ -15,11 +15,11 @@ export interface VNPayReturnData {
 export type VNPayReturnResult =
   | { success: true; code: string; message: string; data: VNPayReturnData }
   | {
-      success: false;
-      code: string;
-      message: string;
-      data?: { orderId?: string };
-    };
+    success: false;
+    code: string;
+    message: string;
+    data?: { orderId?: string };
+  };
 
 @Injectable()
 export class VNPayService {
@@ -166,14 +166,14 @@ export class VNPayService {
       };
     }
 
-    const currCode = vnpParams.vnp_CurrCode;
-    if (currCode !== 'VND') {
-      return {
-        success: false,
-        code: '04',
-        message: 'Invalid currency',
-      };
-    }
+    // const currCode = vnpParams.vnp_CurrCode;
+    // if (currCode !== 'VND') {
+    //   return {
+    //     success: false,
+    //     code: '04',
+    //     message: 'Invalid currency',
+    //   };
+    // }
 
     const responseCode = vnpParams.vnp_ResponseCode;
     const transactionStatus = vnpParams.vnp_TransactionStatus;
