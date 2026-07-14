@@ -13,6 +13,10 @@ export class UpdateTicketTypeDto {
   name?: string;
 
   @IsOptional()
+  @IsString()
+  zoneKey?: string;
+
+  @IsOptional()
   @IsInt()
   @IsPositive()
   price?: number;

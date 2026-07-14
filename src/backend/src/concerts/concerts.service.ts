@@ -5,6 +5,8 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { ConcertStatus, OrderStatus, TicketStatus } from '@prisma/client';
 import { CreateConcertDto } from './dto/create-concert.dto';
 import { UpdateConcertDto } from './dto/update-concert.dto';
+import sanitizeHtml from 'sanitize-html';
+import * as cheerio from 'cheerio';
 import {
   CONCERT_CANCELLED_EVENT,
   ConcertCancelledEvent,
@@ -189,6 +191,36 @@ export class ConcertsService {
 
   async update(id: string, dto: UpdateConcertDto) {
     const existing = await this.adminFindById(id); // 404 guard
+
+    if (dto.status === ConcertStatus.ON_SALE && existing.status !== ConcertStatus.ON_SALE) {
+      if (!existing.seatMapSvg && !dto.seatMapSvg) {
+        throw new BadRequestException('Bắt buộc phải có Sơ đồ chỗ ngồi (Seat Map) trước khi xuất bản.');
+      }
+      if (existing.ticketTypes.length === 0) {
+        throw new BadRequestException('Bắt buộc phải có ít nhất một hạng vé.');
+      }
+      
+      const seatMapToValidate = dto.seatMapSvg ?? existing.seatMapSvg;
+      if (seatMapToValidate) {
+        const $ = cheerio.load(seatMapToValidate, { xmlMode: true });
+        const svgZones = new Set<string>();
+        $('[data-zone]').each((_, el) => {
+          const z = $(el).attr('data-zone');
+          if (z) svgZones.add(z);
+        });
+        
+        for (const tt of existing.ticketTypes) {
+          if (!tt.zoneKey) throw new BadRequestException(`Hạng vé "${tt.name}" chưa được gán khu vực trên sơ đồ.`);
+          if (!svgZones.has(tt.zoneKey)) throw new BadRequestException(`Khu vực "${tt.zoneKey}" của hạng vé "${tt.name}" không tồn tại trên sơ đồ.`);
+          svgZones.delete(tt.zoneKey);
+        }
+        
+        if (svgZones.size > 0) {
+          throw new BadRequestException(`Các khu vực trên sơ đồ chưa được gán cho hạng vé nào: ${Array.from(svgZones).join(', ')}`);
+        }
+      }
+    }
+
     try {
       const updated = await this.prisma.concert.update({
         where: { id },
@@ -235,6 +267,54 @@ export class ConcertsService {
     // Invalidate cache so the deleted concert disappears from audience view
     await this.invalidateCache(concert.slug);
     return { deleted: true };
+  }
+
+  async uploadSeatMap(id: string, svgContent: string) {
+    const concert = await this.adminFindById(id);
+
+    // Sanitize SVG
+    const cleanSvg = sanitizeHtml(svgContent, {
+      allowedTags: sanitizeHtml.defaults.allowedTags.concat([
+        'svg', 'g', 'path', 'circle', 'rect', 'polygon', 'text', 'line', 'defs', 'style'
+      ]),
+      allowedAttributes: {
+        ...sanitizeHtml.defaults.allowedAttributes,
+        '*': ['id', 'class', 'style', 'fill', 'stroke', 'd', 'points', 'x', 'y', 'width', 'height', 'cx', 'cy', 'r', 'data-zone', 'transform', 'opacity', 'viewBox', 'xmlns']
+      },
+      allowVulnerableTags: true // To allow style tags safely
+    });
+
+    const $ = cheerio.load(cleanSvg, { xmlMode: true });
+    const zones = new Set<string>();
+
+    $('[data-zone]').each((_, el) => {
+      const zone = $(el).attr('data-zone');
+      if (zone) {
+        zones.add(zone);
+      }
+    });
+
+    const updated = await this.prisma.concert.update({
+      where: { id },
+      data: { seatMapSvg: cleanSvg },
+    });
+
+    await this.invalidateCache(updated.slug);
+
+    return {
+      zones: Array.from(zones),
+      seatMapSvg: cleanSvg
+    };
+  }
+
+  async removeSeatMap(id: string) {
+    const concert = await this.adminFindById(id);
+    const updated = await this.prisma.concert.update({
+      where: { id },
+      data: { seatMapSvg: null },
+    });
+    await this.invalidateCache(updated.slug);
+    return { removed: true };
   }
 
   async cancel(id: string) {

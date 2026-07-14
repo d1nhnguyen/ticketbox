@@ -7,6 +7,7 @@ import {
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateTicketTypeDto } from './dto/create-ticket-type.dto';
 import { UpdateTicketTypeDto } from './dto/update-ticket-type.dto';
+import * as cheerio from 'cheerio';
 
 @Injectable()
 export class TicketTypesService {
@@ -21,10 +22,23 @@ export class TicketTypesService {
       throw new NotFoundException(`Concert ${dto.concertId} not found`);
     }
 
+    if (dto.zoneKey && concert.seatMapSvg) {
+      const $ = cheerio.load(concert.seatMapSvg, { xmlMode: true });
+      const validZones = new Set<string>();
+      $('[data-zone]').each((_, el) => {
+        const z = $(el).attr('data-zone');
+        if (z) validZones.add(z);
+      });
+      if (!validZones.has(dto.zoneKey)) {
+        throw new BadRequestException(`zoneKey "${dto.zoneKey}" does not exist in the concert's seat map.`);
+      }
+    }
+
     return this.prisma.ticketType.create({
       data: {
         concertId: dto.concertId,
         name: dto.name,
+        zoneKey: dto.zoneKey,
         price: dto.price,
         totalQty: dto.totalQty,
         remainingQty: dto.totalQty, // remaining starts equal to total
@@ -35,8 +49,33 @@ export class TicketTypesService {
   }
 
   async update(id: string, dto: UpdateTicketTypeDto) {
-    const tt = await this.prisma.ticketType.findUnique({ where: { id } });
+    const tt = await this.prisma.ticketType.findUnique({ 
+      where: { id },
+      include: { concert: true }
+    });
     if (!tt) throw new NotFoundException(`Ticket type ${id} not found`);
+
+    if (dto.zoneKey && dto.zoneKey !== tt.zoneKey) {
+      const [orderItemCount, ticketCount] = await Promise.all([
+        this.prisma.orderItem.count({ where: { ticketTypeId: id } }),
+        this.prisma.ticket.count({ where: { ticketTypeId: id } }),
+      ]);
+      if (orderItemCount > 0 || ticketCount > 0) {
+        throw new BadRequestException('Cannot change zoneKey after orders/tickets have been created for this ticket type.');
+      }
+      
+      if (tt.concert.seatMapSvg) {
+        const $ = cheerio.load(tt.concert.seatMapSvg, { xmlMode: true });
+        const validZones = new Set<string>();
+        $('[data-zone]').each((_, el) => {
+          const z = $(el).attr('data-zone');
+          if (z) validZones.add(z);
+        });
+        if (!validZones.has(dto.zoneKey)) {
+          throw new BadRequestException(`zoneKey "${dto.zoneKey}" does not exist in the concert's seat map.`);
+        }
+      }
+    }
 
     // If totalQty is being changed, apply the delta to remainingQty
     let remainingQtyDelta = 0;
@@ -56,6 +95,7 @@ export class TicketTypesService {
         where: { id },
         data: {
           ...(dto.name !== undefined && { name: dto.name }),
+          ...(dto.zoneKey !== undefined && { zoneKey: dto.zoneKey }),
           ...(dto.price !== undefined && { price: dto.price }),
           ...(dto.totalQty !== undefined && {
             totalQty: dto.totalQty,

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import apiClient from '../api/client';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../hooks/useAuth';
@@ -109,7 +109,7 @@ export default function AudienceDashboard() {
 
   return (
     <div style={{ maxWidth: '1000px', margin: '40px auto', padding: '0 20px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-      <h1 style={{ fontSize: '2.2rem', marginBottom: '8px', color: '#0f172a' }}>🎟️ Trang cá nhân của tôi</h1>
+      <h1 style={{ fontSize: '2.2rem', marginBottom: '8px', color: '#0f172a' }}> Trang cá nhân của tôi</h1>
       <p style={{ color: '#64748b', marginBottom: '30px' }}>Quản lý vé xem concert và lịch sử thanh toán đơn hàng.</p>
 
       {/* Tabs */}
@@ -204,7 +204,7 @@ export default function AudienceDashboard() {
                           {ticket.concert?.title}
                         </h3>
                         <p style={{ fontSize: '0.85rem', margin: '0 0 15px 0', opacity: 0.8 }}>
-                          📍 {ticket.concert?.venue}
+                           {ticket.concert?.venue}
                         </p>
 
                         <div style={{ borderTop: '1px dashed rgba(255, 255, 255, 0.2)', paddingTop: '15px', display: 'flex', justifyContent: 'space-between' }}>
@@ -240,7 +240,7 @@ export default function AudienceDashboard() {
                 </div>
               ) : (
                 <div style={{ padding: '60px 20px', textAlign: 'center', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                  <span style={{ fontSize: '3rem' }}>🎟️</span>
+                  <span style={{ fontSize: '3rem' }}></span>
                   <h3 style={{ color: '#1e293b', marginTop: '15px' }}>Bạn chưa sở hữu vé nào</h3>
                   <p style={{ color: '#64748b', marginTop: '5px' }}>Hãy chọn và đặt mua vé ở trang chủ ngay thôi!</p>
                 </div>
@@ -343,7 +343,7 @@ export default function AudienceDashboard() {
                 </div>
               ) : (
                 <div style={{ padding: '60px 20px', textAlign: 'center', color: '#64748b' }}>
-                  <p style={{ fontSize: '3rem', marginBottom: '10px' }}>🛒</p>
+                  <p style={{ fontSize: '3rem', marginBottom: '10px' }}>�</p>
                   <p>Bạn chưa thực hiện giao dịch nào.</p>
                 </div>
               )}
@@ -424,7 +424,7 @@ export default function AudienceDashboard() {
             </div>
 
             <p style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 'bold', margin: '0 0 5px 0' }}>
-              ⚠️ CẢNH BÁO BẢO MẬT
+              ⚠ CẢNH BÁO BẢO MẬT
             </p>
             <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0, lineHeight: '1.4' }}>
               Không chia sẻ mã QR này với bất kỳ ai để tránh bị quét vé giả hoặc mất quyền check-in.

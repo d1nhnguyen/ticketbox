@@ -9,7 +9,12 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Put,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/roles.guard';
 import { Roles } from 'src/auth/roles.decorator';
@@ -59,5 +64,24 @@ export class ConcertsAdminController {
   @Get(':id/stats')
   getStats(@Param('id') id: string) {
     return this.concertsService.getStats(id);
+  }
+
+  @Put(':id/seat-map')
+  @UseInterceptors(FileInterceptor('file', {
+    limits: { fileSize: 256 * 1024 }, // 256KB
+  }))
+  uploadSeatMap(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) throw new BadRequestException('File is required');
+    if (file.mimetype !== 'image/svg+xml') throw new BadRequestException('Only SVG files are allowed');
+    return this.concertsService.uploadSeatMap(id, file.buffer.toString('utf8'));
+  }
+
+  @Delete(':id/seat-map')
+  @HttpCode(HttpStatus.OK)
+  removeSeatMap(@Param('id') id: string) {
+    return this.concertsService.removeSeatMap(id);
   }
 }

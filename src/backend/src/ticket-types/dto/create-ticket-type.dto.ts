@@ -6,6 +6,7 @@ import {
   IsPositive,
   IsDateString,
   Min,
+  IsOptional,
 } from 'class-validator';
 
 export class CreateTicketTypeDto {
@@ -16,6 +17,10 @@ export class CreateTicketTypeDto {
   @IsString()
   @IsNotEmpty()
   name: string;
+
+  @IsString()
+  @IsOptional()
+  zoneKey?: string;
 
   @IsInt()
   @IsPositive()

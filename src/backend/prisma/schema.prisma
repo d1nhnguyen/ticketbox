@@ -91,6 +91,7 @@ model TicketType {
   id           String   @id @default(uuid())
   concertId    String
   name         String
+  zoneKey      String?
   price        Int
   totalQty     Int
   remainingQty Int
@@ -102,6 +103,7 @@ model TicketType {
   tickets    Ticket[]
 
   @@index([concertId])
+  @@unique([concertId, zoneKey])
 }
 
 model Order {

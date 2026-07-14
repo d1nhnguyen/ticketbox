@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../../api/client';
 import { useAuth } from '../../hooks/useAuth';
@@ -127,7 +127,7 @@ export default function AiBioUpload() {
           {/* Select Concert */}
           <div style={{ marginBottom: '24px' }}>
             <label style={{ display: 'block', fontWeight: 600, color: '#374151', marginBottom: '8px', fontSize: '0.95rem' }}>
-              🎵 Chọn Concert
+              � Chọn Concert
             </label>
             <select
               value={selectedConcertId}
@@ -149,7 +149,7 @@ export default function AiBioUpload() {
           {/* Drag & Drop Zone */}
           <div style={{ marginBottom: '24px' }}>
             <label style={{ display: 'block', fontWeight: 600, color: '#374151', marginBottom: '8px', fontSize: '0.95rem' }}>
-              📄 Press-kit PDF
+              � Press-kit PDF
             </label>
             <div
               onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -175,7 +175,7 @@ export default function AiBioUpload() {
               />
               {file ? (
                 <>
-                  <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>📑</div>
+                  <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>�</div>
                   <div style={{ fontWeight: 700, color: '#059669', fontSize: '1rem' }}>{file.name}</div>
                   <div style={{ color: '#6b7280', fontSize: '0.85rem', marginTop: '4px' }}>
                     {(file.size / 1024).toFixed(1)} KB — Bấm để đổi file
@@ -183,7 +183,7 @@ export default function AiBioUpload() {
                 </>
               ) : (
                 <>
-                  <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>☁️</div>
+                  <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>☁</div>
                   <div style={{ fontWeight: 600, color: '#374151', fontSize: '1rem' }}>
                     Kéo thả file PDF vào đây hoặc bấm để chọn
                   </div>
@@ -202,7 +202,7 @@ export default function AiBioUpload() {
               padding: '12px 16px', color: '#dc2626', marginBottom: '20px',
               display: 'flex', alignItems: 'center', gap: '8px'
             }}>
-              <span>⚠️</span> {error}
+              <span>⚠</span> {error}
             </div>
           )}
 
@@ -227,7 +227,7 @@ export default function AiBioUpload() {
                 AI đang phân tích press kit...
               </>
             ) : (
-              '🚀 Tạo Artist Bio bằng AI'
+              '� Tạo Artist Bio bằng AI'
             )}
           </button>
         </div>
@@ -256,7 +256,7 @@ export default function AiBioUpload() {
           </div>
           <div style={{ padding: '24px' }}>
             <h3 style={{ color: '#374151', fontWeight: 700, marginBottom: '12px', fontSize: '1rem' }}>
-              📝 Nội dung Artist Bio:
+              � Nội dung Artist Bio:
             </h3>
             <div style={{
               background: '#f8fafc',
@@ -279,7 +279,7 @@ export default function AiBioUpload() {
                   color: '#667eea', fontWeight: 600, cursor: 'pointer', fontSize: '0.9rem'
                 }}
               >
-                📋 Sao chép
+                � Sao chép
               </button>
               <button
                 onClick={() => navigate('/admin')}

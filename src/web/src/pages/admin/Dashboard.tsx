@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../../api/client';
 import { useAuth } from '../../hooks/useAuth';
@@ -140,7 +140,7 @@ export default function Dashboard() {
     <div style={{ maxWidth: '1200px', margin: '40px auto', padding: '0 20px' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', flexWrap: 'wrap', gap: '12px' }}>
-        <h1 style={{ color: '#111827', fontSize: '2rem', margin: 0 }}>⚙️ Admin Dashboard</h1>
+        <h1 style={{ color: '#111827', fontSize: '2rem', margin: 0 }}>⚙ Admin Dashboard</h1>
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           <button
             onClick={() => navigate('/admin/csv-upload')}
@@ -150,7 +150,7 @@ export default function Dashboard() {
               borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '0.9rem'
             }}
           >
-            📋 Import CSV Khách mời
+            � Import CSV Khách mời
           </button>
           <button
             onClick={() => navigate('/admin/ai-bio')}
@@ -198,7 +198,7 @@ export default function Dashboard() {
           boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
         }}>
           <h3 style={{ color: '#6b7280', fontSize: '1rem', marginBottom: '10px', fontWeight: 500 }}>
-            💰 Tổng Doanh Thu (đã thanh toán)
+            � Tổng Doanh Thu (đã thanh toán)
           </h3>
           <p style={{ fontSize: '2rem', fontWeight: 800, color: '#10b981', margin: 0 }}>
             {stats.totalRevenue.toLocaleString('vi-VN')} VNĐ
@@ -210,7 +210,7 @@ export default function Dashboard() {
           boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
         }}>
           <h3 style={{ color: '#6b7280', fontSize: '1rem', marginBottom: '10px', fontWeight: 500 }}>
-            🎟️ Tổng Số Vé Đã Bán
+             Tổng Số Vé Đã Bán
           </h3>
           <p style={{ fontSize: '2rem', fontWeight: 800, color: '#3b82f6', margin: 0 }}>
             {stats.totalTicketsSold} vé
@@ -222,7 +222,7 @@ export default function Dashboard() {
           boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
         }}>
           <h3 style={{ color: '#6b7280', fontSize: '1rem', marginBottom: '10px', fontWeight: 500 }}>
-            🎪 Tổng Sự Kiện
+            � Tổng Sự Kiện
           </h3>
           <p style={{ fontSize: '2rem', fontWeight: 800, color: '#8b5cf6', margin: 0 }}>
             {concerts.length} concert
@@ -238,7 +238,7 @@ export default function Dashboard() {
           boxShadow: '0 4px 24px rgba(0,0,0,0.07)'
         }}>
           <h2 style={{ fontSize: '1.4rem', marginBottom: '20px', fontWeight: 700, color: '#111827' }}>
-            🎪 Tạo sự kiện mới
+            � Tạo sự kiện mới
           </h2>
 
           {createError && (
@@ -246,7 +246,7 @@ export default function Dashboard() {
               background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px',
               padding: '12px 16px', color: '#dc2626', marginBottom: '16px', fontSize: '0.9rem'
             }}>
-              ⚠️ {createError}
+              ⚠ {createError}
             </div>
           )}
 
@@ -327,7 +327,7 @@ export default function Dashboard() {
                   boxSizing: 'border-box', background: '#fafafa', cursor: 'pointer', color: '#111827',
                 }}
               >
-                <option value="ON_SALE">🟢 ON_SALE — Hiển thị đến khán giả ngay</option>
+                <option value="ON_SALE">� ON_SALE — Hiển thị đến khán giả ngay</option>
                 <option value="DRAFT">□ DRAFT — Ẩn khỏi danh sách (chưa công bố)</option>
               </select>
             </div>
@@ -347,7 +347,7 @@ export default function Dashboard() {
                 fontWeight: 700, cursor: isCreating ? 'not-allowed' : 'pointer', fontSize: '0.95rem'
               }}
             >
-              {isCreating ? '⏳ Đang lưu...' : '💾 Lưu sự kiện'}
+              {isCreating ? '⏳ Đang lưu...' : '� Lưu sự kiện'}
             </button>
             <button
               onClick={() => { setShowCreateForm(false); setCreateError(''); setCreateForm({ title: '', venue: '', startsAt: '', slug: '', status: 'ON_SALE' }); }}
@@ -370,7 +370,7 @@ export default function Dashboard() {
       }}>
         <div style={{ padding: '20px 24px', borderBottom: '1px solid #f3f4f6' }}>
           <h2 style={{ margin: 0, fontSize: '1.2rem', color: '#111827', fontWeight: 700 }}>
-            📋 Danh sách Sự kiện
+            � Danh sách Sự kiện
           </h2>
         </div>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -424,7 +424,7 @@ export default function Dashboard() {
                       fontSize: '0.85rem', fontWeight: 500, marginRight: '8px'
                     }}
                   >
-                    🔍 Chi tiết
+                    � Chi tiết
                   </button>
                   <button
                     onClick={() => handleDelete(c.id)}

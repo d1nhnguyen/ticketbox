@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import apiClient from '../api/client';
 import { QRCodeSVG } from 'qrcode.react';
@@ -237,7 +237,7 @@ export default function OrderSuccess() {
                   {order.concert?.title || 'Concert Ticket'}
                 </h2>
                 <p style={{ margin: '0 0 20px 0', opacity: 0.8, fontSize: '0.95rem' }}>
-                  📍 {order.concert?.venue}
+                   {order.concert?.venue}
                 </p>
               </div>
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+﻿import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../../api/client';
 import { useAuth } from '../../hooks/useAuth';
@@ -159,7 +159,7 @@ export default function CsvUpload() {
         </button>
         <div>
           <h1 style={{ fontSize: '1.8rem', fontWeight: 800, color: '#111827', margin: 0 }}>
-            📋 Guest List CSV Import
+            � Guest List CSV Import
           </h1>
           <p style={{ color: '#6b7280', marginTop: '4px', fontSize: '0.95rem' }}>
             Upload danh sách khách mời CSV · Hệ thống tự động dedup và báo lỗi từng dòng
@@ -177,7 +177,7 @@ export default function CsvUpload() {
           background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
           padding: '24px 28px', color: 'white'
         }}>
-          <div style={{ fontSize: '2rem', marginBottom: '8px' }}>📊</div>
+          <div style={{ fontSize: '2rem', marginBottom: '8px' }}>�</div>
           <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>Import Danh Sách Khách Mời</h2>
           <p style={{ margin: '4px 0 0', opacity: 0.85, fontSize: '0.9rem' }}>
             Hỗ trợ file lỗi / trùng · Checksum dedup · Xử lý bất đồng bộ qua BullMQ · Không crash khi có dòng lỗi
@@ -188,7 +188,7 @@ export default function CsvUpload() {
           {/* Concert Select */}
           <div style={{ marginBottom: '24px' }}>
             <label style={{ display: 'block', fontWeight: 600, color: '#374151', marginBottom: '8px', fontSize: '0.95rem' }}>
-              🎵 Chọn Concert
+              � Chọn Concert
             </label>
             <select
               value={selectedConcertId}
@@ -212,7 +212,7 @@ export default function CsvUpload() {
             background: '#eff6ff', borderRadius: '10px', border: '1px solid #bfdbfe',
             padding: '12px 16px', marginBottom: '20px', fontSize: '0.85rem', color: '#1e40af'
           }}>
-            <strong>💡 Files mẫu để demo:</strong>
+            <strong>� Files mẫu để demo:</strong>
             <ul style={{ margin: '6px 0 0', paddingLeft: '20px', lineHeight: 1.7 }}>
               <li><code>guests-valid.csv</code> — tất cả dòng hợp lệ → rowsOk {'>'} 0</li>
               <li><code>guests-with-errors.csv</code> — có dòng lỗi → rowsFailed {'>'} 0, không crash</li>
@@ -224,7 +224,7 @@ export default function CsvUpload() {
           {/* Drag & Drop */}
           <div style={{ marginBottom: '24px' }}>
             <label style={{ display: 'block', fontWeight: 600, color: '#374151', marginBottom: '8px', fontSize: '0.95rem' }}>
-              📁 File CSV
+              � File CSV
             </label>
             <div
               onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -250,7 +250,7 @@ export default function CsvUpload() {
               />
               {file ? (
                 <>
-                  <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>📊</div>
+                  <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>�</div>
                   <div style={{ fontWeight: 700, color: '#059669', fontSize: '1rem' }}>{file.name}</div>
                   <div style={{ color: '#6b7280', fontSize: '0.85rem', marginTop: '4px' }}>
                     {(file.size / 1024).toFixed(1)} KB — Bấm để đổi file
@@ -258,7 +258,7 @@ export default function CsvUpload() {
                 </>
               ) : (
                 <>
-                  <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>☁️</div>
+                  <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>☁</div>
                   <div style={{ fontWeight: 600, color: '#374151', fontSize: '1rem' }}>
                     Kéo thả file CSV vào đây hoặc bấm để chọn
                   </div>
@@ -277,7 +277,7 @@ export default function CsvUpload() {
               padding: '12px 16px', color: '#dc2626', marginBottom: '20px',
               display: 'flex', alignItems: 'center', gap: '8px'
             }}>
-              <span>⚠️</span> {error}
+              <span>⚠</span> {error}
             </div>
           )}
 
@@ -297,7 +297,7 @@ export default function CsvUpload() {
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
             }}
           >
-            {isUploading ? '⏳ Đang gửi file...' : '📤 Upload & Import CSV'}
+            {isUploading ? '⏳ Đang gửi file...' : '� Upload & Import CSV'}
           </button>
         </div>
       </div>
@@ -348,7 +348,7 @@ export default function CsvUpload() {
                   {batch.rowsTotal}
                 </div>
                 <div style={{ color: '#64748b', fontSize: '0.85rem', marginTop: '4px', fontWeight: 500 }}>
-                  📊 Tổng dòng
+                  � Tổng dòng
                 </div>
               </div>
               {/* OK */}
@@ -382,7 +382,7 @@ export default function CsvUpload() {
                 marginTop: '16px', background: '#fffbeb', border: '1px solid #fde68a',
                 borderRadius: '10px', padding: '12px 16px', color: '#92400e', fontSize: '0.9rem'
               }}>
-                ⚠️ <strong>{batch.rowsFailed} dòng bị bỏ qua</strong> do thiếu thông tin bắt buộc hoặc trùng lặp — batch vẫn THÀNH CÔNG, không crash.
+                ⚠ <strong>{batch.rowsFailed} dòng bị bỏ qua</strong> do thiếu thông tin bắt buộc hoặc trùng lặp — batch vẫn THÀNH CÔNG, không crash.
               </div>
             )}
 
@@ -396,7 +396,7 @@ export default function CsvUpload() {
                     color: '#0891b2', fontWeight: 600, cursor: 'pointer', fontSize: '0.9rem'
                   }}
                 >
-                  📤 Upload file khác
+                  � Upload file khác
                 </button>
                 <button
                   onClick={() => navigate('/admin')}
