@@ -30,7 +30,7 @@
 | IM13 | `PARTIAL` | Demo circuit breaker `OPEN → HALF_OPEN → CLOSED`, payment trả fallback phù hợp và concert browsing không bị ảnh hưởng. |
 | IM14 | `PARTIAL` | Chạy duplicate/retry demo với cùng `Idempotency-Key`; chứng minh không tạo order hoặc charge thứ hai. |
 | IM15 | `PARTIAL` | Chạy cache evidence: MISS, HIT, TTL và invalidation sau khi concert/ticket data thay đổi. |
-| IM16 | `PARTIAL` | Rà README, sửa đường dẫn/tên sample CSV, ghi rõ Scanner PWA, xác nhận account seed/URL demo và thử quick start từ trạng thái sạch. |
+| IM16 | `PARTIAL` | Rà README, sửa đường dẫn sample CSV, ghi rõ Scanner PWA là mobile implementation, xác nhận account seed/URL demo và thử quick start từ trạng thái sạch. |
 | IM18 | `PARTIAL` | Chạy toàn bộ hệ thống theo Blueprint từ volume sạch, thực hiện các journey chính và lưu evidence/video. |
 
 ## 2. Thứ tự thực hiện
@@ -97,7 +97,7 @@ Mỗi demo cần lưu output terminal, HTTP/DB assertion hoặc đoạn video ng
 
 1. Đối chiếu README với Compose, seed accounts, port và URL hiện tại.
 2. Sửa đúng đường dẫn `data/sample-csv/` và tên các file CSV mẫu.
-3. Ghi rõ mock gateway là demo path, VNPay là optional và Scanner PWA là mobile scanner implementation.
+3. Ghi rõ Scanner PWA là mobile scanner implementation của rubric.
 4. Từ volume sạch, chạy:
 
 ```powershell
