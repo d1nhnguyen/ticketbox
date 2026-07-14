@@ -65,8 +65,13 @@ services:
       REDIS_URL: redis://redis:6379
       JWT_SECRET: supersecret_dev
       NODE_ENV: production
+      TZ: Asia/Ho_Chi_Minh
       MOCK_PAYMENT_URL: http://mock-gateway:4000
-      VNPAY_ENABLED: "false"
+      VNPAY_ENABLED: "${VNPAY_ENABLED:-false}"
+      VNPAY_URL: "${VNPAY_URL:-}"
+      VNPAY_TMN_CODE: "${VNPAY_TMN_CODE:-}"
+      VNPAY_HASH_SECRET: "${VNPAY_HASH_SECRET:-}"
+      VNPAY_RETURN_URL: "${VNPAY_RETURN_URL:-}"
       CORS_ALLOWED_ORIGINS: "http://localhost:5173,http://localhost:5174"
       MAIL_HOST: mailpit
       MAIL_PORT: "1025"

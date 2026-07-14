@@ -101,6 +101,23 @@ describe('VNPayService configuration', () => {
       service.createPaymentUrl('order-1', 1000, 'test', '127.0.0.1'),
     ).toContain('https://sandbox.example/pay?');
   });
+
+  it('creates VNPay timestamps in GMT+7 regardless of the server timezone', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-14T09:08:45.000Z'));
+    const service = createEnabledService();
+
+    const paymentUrl = new URL(
+      service.createPaymentUrl('order-1', 1000, 'test', '127.0.0.1'),
+    );
+
+    expect(paymentUrl.searchParams.get('vnp_CreateDate')).toBe(
+      '20260714160845',
+    );
+    expect(paymentUrl.searchParams.get('vnp_ExpireDate')).toBe(
+      '20260714161845',
+    );
+    jest.useRealTimers();
+  });
 });
 
 describe('VNPayService.verifyReturnUrl', () => {
