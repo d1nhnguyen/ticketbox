@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { QRCodeSVG } from 'qrcode.react';
+import DOMPurify from 'dompurify';
 
 import { useAuth } from '../hooks/useAuth';
 import { usePaymentMethods } from '../hooks/usePaymentMethods';
@@ -21,6 +22,7 @@ export default function ConcertDetail() {
   const [checkoutError, setCheckoutError] = useState('');
   const [issuedTickets] = useState<any[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<'VNPAY' | 'MOCK'>('MOCK');
+  const seatMapRef = useRef<HTMLDivElement>(null);
 
   // Hiển thị lỗi từ cổng thanh toán truyền về nếu có và hủy order ngay lập tức để giải phóng vé
   useEffect(() => {
@@ -92,6 +94,49 @@ export default function ConcertDetail() {
   const totalTickets = Object.values(quantities).reduce((a, b) => a + b, 0);
 
   const activeTicketTypeId = Object.entries(quantities).find(([_, qty]) => qty > 0)?.[0];
+
+  // Sơ đồ SVG lấy từ seed/admin đi qua sanitize trước khi dangerouslySetInnerHTML để chặn stored XSS.
+  const sanitizedSeatMapSvg = useMemo(() => {
+    if (!concert?.seatMapSvg) return '';
+    return DOMPurify.sanitize(concert.seatMapSvg, { USE_PROFILES: { svg: true, svgFilters: true } });
+  }, [concert?.seatMapSvg]);
+
+  // Gắn tương tác (click chọn vé + đổi màu theo trạng thái) lên các khu vực [data-zone]
+  // của SVG seed, khớp theo tên ticket type (SVIP/VIP/CAT1/CAT2/GA).
+  useEffect(() => {
+    const container = seatMapRef.current;
+    if (!container || !sanitizedSeatMapSvg) return;
+
+    const zoneEls = container.querySelectorAll<SVGElement>('[data-zone]');
+    zoneEls.forEach((el) => {
+      const ticket = concert.ticketTypes?.find((t: any) => t.name === el.getAttribute('data-zone'));
+      if (!ticket) {
+        el.onclick = null;
+        (el as unknown as HTMLElement).style.cursor = 'default';
+        return;
+      }
+
+      const isSaleStarted = new Date() >= new Date(ticket.saleStartsAt);
+      const isSoldOut = ticket.remainingQty === 0;
+      const qtySelected = quantities[ticket.id] || 0;
+      const isSelected = qtySelected > 0;
+      const isLocked = (activeTicketTypeId && ticket.id !== activeTicketTypeId) || !isSaleStarted;
+      const isDisabled = isSoldOut || isLocked;
+
+      const style = (el as unknown as HTMLElement).style;
+      style.cursor = isDisabled ? 'not-allowed' : 'pointer';
+      style.filter = isDisabled ? 'grayscale(0.85) opacity(0.55)' : 'none';
+      style.stroke = isSelected ? '#111827' : '';
+      style.strokeWidth = isSelected ? '5' : '';
+      style.transition = 'filter 0.2s ease-in-out, stroke-width 0.2s ease-in-out';
+
+      el.onclick = () => {
+        if (!isDisabled && qtySelected < ticket.maxPerUser) {
+          handleQuantityChange(ticket.id, 1, ticket.maxPerUser, ticket.remainingQty);
+        }
+      };
+    });
+  }, [sanitizedSeatMapSvg, concert?.ticketTypes, quantities, activeTicketTypeId]);
 
   const handleCheckout = async () => {
     if (!token) {
@@ -274,10 +319,11 @@ export default function ConcertDetail() {
           <div style={{ flex: '1 1 500px', background: '#f8fafc', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column' }}>
             <h3 style={{ fontSize: '1.3rem', marginBottom: '20px', color: '#334155', textAlign: 'center' }}>Sơ đồ & Tình trạng ghế</h3>
 
-            {concert.seatMapSvg ? (
+            {sanitizedSeatMapSvg ? (
               <div
+                ref={seatMapRef}
                 style={{ width: '100%', minHeight: '400px' }}
-                dangerouslySetInnerHTML={{ __html: concert.seatMapSvg }}
+                dangerouslySetInnerHTML={{ __html: sanitizedSeatMapSvg }}
               />
             ) : (
               <svg viewBox="0 0 800 600" style={{ width: '100%', height: '100%', minHeight: '400px', userSelect: 'none' }}>
@@ -344,7 +390,7 @@ export default function ConcertDetail() {
               </svg>
             )}
             <p style={{ textAlign: 'center', fontSize: '0.9rem', color: '#64748b', marginTop: '15px' }}>
-              {!concert.seatMapSvg && '* Bấm trực tiếp vào khu vực trên bản đồ để chọn vé nhanh'}
+              * Bấm trực tiếp vào khu vực trên bản đồ để chọn vé nhanh
             </p>
           </div>
 

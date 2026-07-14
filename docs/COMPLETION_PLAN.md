@@ -58,7 +58,7 @@ Rubric vẫn yêu cầu **thiết kế và chứng minh cơ chế** cho tải 80
 
 | Mã | Trạng thái | Bằng chứng hiện tại | Việc còn lại |
 |---|---|---|---|
-| IM01 | `PARTIAL` | List/detail, venue, SVG zone fallback và polling availability đã có. | Seed/UI cần thông tin nghệ sĩ rõ ràng và seed `seatMapSvg` thật. |
+| IM01 | `DONE` | List/detail, venue, polling availability, seed `artists`/`seatMapSvg` thật và sơ đồ SVG tương tác theo `data-zone` (click chọn vé, sold-out/locked đổi màu, sanitize XSS) ngày 2026-07-14. | Gắn screenshot/video acceptance sau khi chạy thật. |
 | IM02 | `DONE` | Purchase, mock payment, ticket issuance và QR trong web/email. | Giữ một evidence buy-to-QR-email. |
 | IM03 | `PARTIAL` | Per-user limit tính PAID + PENDING trong transaction. | Chạy concurrency script và lưu assertion. |
 | IM04 | `PARTIAL` | App/email e-ticket đã E2E pass; reminder cron có code. | Chạy reminder khoảng 24h và lưu evidence. |
@@ -74,7 +74,7 @@ Rubric vẫn yêu cầu **thiết kế và chứng minh cơ chế** cho tải 80
 | IM14 | `PARTIAL` | Redis + DB + gateway idempotency đã cài thật. | Chạy duplicate/retry evidence. |
 | IM15 | `PARTIAL` | Cache TTL/invalidation đã cài thật. | Chạy cache evidence. |
 | IM16 | `PARTIAL` | README có Docker quick start, seed accounts và demo guides. | Sửa đường dẫn/tên sample CSV và chạy lại từ máy/trạng thái sạch. |
-| IM17 | `PARTIAL` | Seed có 4 concert, ticket types và giá. | Thêm thông tin nghệ sĩ và `seatMapSvg` vào seed, kiểm tra fresh seed. |
+| IM17 | `DONE` | Seed có 4 concert, ticket types, giá, `artists` (7–8 nghệ sĩ/concert) và `seatMapSvg` (5 zone SVIP/VIP/CAT1/CAT2/GA). Xác nhận fresh seed qua `down -v && up --build` ngày 2026-07-14. | — |
 | IM18 | `PARTIAL` | Full Compose 7 service đã build và healthy ngày 2026-07-14. | Demo toàn bộ theo Blueprint từ volume sạch và lưu evidence/video. |
 
 ## 2. Definition of Done tối giản
@@ -98,9 +98,9 @@ TicketBox được xem là hoàn thành khi:
 
 ### 3.1 Đã có trong code
 
-- [x] Bốn concert seed đúng tên đề bài, ticket types và ba tài khoản role.
+- [x] Bốn concert seed đúng tên đề bài, ticket types, giá, `artists` và `seatMapSvg`, ba tài khoản role.
 - [x] JWT authentication và RBAC `AUDIENCE`, `ORGANIZER`, `SCANNER`.
-- [x] Concert list/detail, SVG zones và polling số vé còn lại.
+- [x] Concert list/detail, SVG zone map (seed tương tác qua `data-zone`, sanitize XSS, fallback auto-layout) và polling số vé còn lại.
 - [x] Atomic inventory reservation, chống oversell và per-user limit.
 - [x] Redis idempotency, token-bucket rate limiting và cache-aside.
 - [x] Mock payment gateway, circuit breaker và QR ticket issuance.
@@ -121,7 +121,6 @@ TicketBox được xem là hoàn thành khi:
 |---|---|---|
 | Manual browser scanner journey | `MUST` | Code có, chưa chạy đủ offline/reload/two-device. |
 | Scheduled CSV ingestion | `MUST` | Hiện chỉ có upload thủ công. |
-| Seed artist + seat map | `MUST` | Có 4 concert/ticket/giá nhưng chưa có artist field rõ ràng và `seatMapSvg` trong seed. |
 | Real AI demonstration | `MUST` | Code provider có; cần key và bằng chứng một lần chạy thật. |
 | Blueprint BP04/BP06/BP08/BP10/BP11 | `MUST` | Cần bổ sung high-level diagram, purchase E2E, scheduled CSV, capacity reasoning và graceful degradation. |
 | VNPay currency validation | `SHOULD` | Optional path còn 1 unit test fail vì currency check đang bị tắt; sửa trước khi chốt full test. |
@@ -190,17 +189,21 @@ Không cần delivery dashboard, exactly-once email hoặc SMTP production audit
 
 Không cần distributed file watcher hoặc object storage.
 
-## 4.5 Seed artist và seat map (`MUST`)
+## 4.5 Seed artist và seat map (`MUST`) — `DONE` (2026-07-14)
 
-Rubric IM01/IM17 yêu cầu seed không chỉ có concert/ticket/giá mà còn có nghệ sĩ và sơ đồ chỗ ngồi.
+Rubric IM01/IM17 yêu cầu seed không chỉ có concert/ticket/giá mà còn có nghệ sĩ và sơ đồ chỗ ngồi, và sơ đồ đó phải tương tác được (chọn vé theo khu, phản ánh sold-out) chứ không chỉ là ảnh tĩnh.
 
-1. Chọn representation tối thiểu cho nghệ sĩ, ưu tiên trường `artists` hoặc `artistName` rõ ràng thay vì suy ra từ title/bio.
-2. Thêm SVG zone map vào `seatMapSvg` của cả bốn concert seed.
-3. Cho `prisma/seed.ts` lưu các trường mới.
-4. Concert detail ưu tiên render SVG seed; fallback auto-layout chỉ dùng khi dữ liệu thiếu.
-5. Fresh seed phải hiển thị đúng nghệ sĩ, venue, zone, giá và availability.
+- [x] Dùng `artists String[]` cho thông tin nghệ sĩ (migration `20260625000000_add_concert_artists`).
+- [x] Thêm `artists` và `seatMapSvg` cho bốn concert seed (`data/seed/concerts.json`).
+- [x] Cho `prisma/seed.ts` lưu hai trường trên.
+- [x] SVG seed tương tác theo canonical zone `SVIP`/`VIP`/`CAT1`/`CAT2`/`GA` qua thuộc tính `data-zone` khớp đúng tên `ticketType.name`.
+- [x] Click zone chọn/tăng số lượng đúng ticket type tương ứng (`ConcertDetail.tsx`, wiring qua `ref` + `useEffect` vì nội dung SVG được bơm bằng `dangerouslySetInnerHTML`).
+- [x] Zone sold-out/locked (đã chọn loại vé khác, hoặc chưa mở bán) chuyển `grayscale + opacity`, cursor `not-allowed`; zone đang chọn có stroke đậm.
+- [x] Sanitize `seatMapSvg` bằng `DOMPurify` (`USE_PROFILES: { svg: true, svgFilters: true }`) trước khi `dangerouslySetInnerHTML`, chặn `<script>`/`on*` handler — quan trọng vì `seatMapSvg` cũng nhận giá trị tự do qua admin API (`create`/`update` concert), không chỉ từ seed.
+- [x] Auto-layout cũ giữ làm fallback khi concert không có `seatMapSvg`.
+- [x] Chạy fresh seed (`docker compose down -v && up -d --build`) và kiểm tra UI: đủ 4 concert, đúng nghệ sĩ, đúng zone/giá/availability, sơ đồ tương tác qua headless-browser click.
 
-**Hoàn thành khi:** `docker compose down -v` rồi khởi động lại vẫn có đủ 4 concert, artist data, ticket types/price và SVG seat map từ seed.
+**Hoàn thành khi:** `docker compose down -v` rồi khởi động lại vẫn có đủ 4 concert, artist data, ticket types/price và SVG seat map tương tác từ seed. Đã xác nhận bằng migration log, API response (`artists`, `seatMapSvg` có `data-zone`) và click trực tiếp vào từng zone trên trình duyệt (không qua nút +/-) cập nhật đúng giỏ hàng.
 
 ## 4.6 AI Artist Bio (`MUST`)
 
@@ -275,7 +278,7 @@ Theo `requirements.md` §7:
 ## 5. Thứ tự thực hiện đề xuất
 
 1. Scheduled CSV inbox (`BP08`, `IM10`).
-2. Seed artist + `seatMapSvg` (`IM01`, `IM17`).
+2. ~~Seed artist + `seatMapSvg` (`IM01`, `IM17`)~~ — done 2026-07-14 (§4.5).
 3. Hoàn thiện high-level/purchase/traffic/graceful-degradation Blueprint (`BP04`, `BP06`, `BP10`, `BP11`).
 4. Manual scanner acceptance (`IM07`, `IM08`).
 5. Real AI provider run (`IM09`).
