@@ -29,6 +29,16 @@ services:
       timeout: 5s
       retries: 5
 
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: ticketbox_mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+
   mock-gateway:
     build:
       context: ./src/mock-gateway
@@ -58,6 +68,10 @@ services:
       MOCK_PAYMENT_URL: http://mock-gateway:4000
       VNPAY_ENABLED: "false"
       CORS_ALLOWED_ORIGINS: "http://localhost:5173,http://localhost:5174"
+      MAIL_HOST: mailpit
+      MAIL_PORT: "1025"
+      MAIL_SECURE: "false"
+      MAIL_FROM: "TicketBox <no-reply@ticketbox.local>"
     volumes:
       - ./data:/data
     depends_on:
@@ -67,6 +81,8 @@ services:
         condition: service_healthy
       mock-gateway:
         condition: service_healthy
+      mailpit:
+        condition: service_started
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/health"]
       interval: 5s

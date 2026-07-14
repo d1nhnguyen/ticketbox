@@ -10,6 +10,12 @@ import {
 @Injectable()
 export class NotificationsListener {
   private readonly logger = new Logger(NotificationsListener.name);
+  private readonly emailJobOptions = {
+    attempts: 3,
+    backoff: { type: 'exponential' as const, delay: 2000 },
+    removeOnComplete: 100,
+    removeOnFail: 100,
+  };
 
   constructor(@InjectQueue('notifications') private notificationsQueue: Queue) { }
 
@@ -18,14 +24,21 @@ export class NotificationsListener {
     this.logger.log(`Handling order.paid event for order ${order.id}`);
 
     // Enqueue email notification
-    await this.notificationsQueue.add('notification.send', {
-      channel: 'EMAIL',
-      payload: {
-        userId: order.userId,
-        type: 'ORDER_PAID',
-        data: { orderId: order.id, totalAmount: order.totalAmount },
+    await this.notificationsQueue.add(
+      'notification.send',
+      {
+        channel: 'EMAIL',
+        payload: {
+          userId: order.userId,
+          type: 'ORDER_PAID',
+          data: {
+            orderId: order.id,
+            totalAmount: order.totalAmount,
+          },
+        },
       },
-    });
+      this.emailJobOptions,
+    );
 
     // Enqueue in-app notification
     await this.notificationsQueue.add('notification.send', {
@@ -50,18 +63,22 @@ export class NotificationsListener {
 
     for (const userId of event.buyerUserIds) {
       // Enqueue EMAIL notification cho từng người mua
-      await this.notificationsQueue.add('notification.send', {
-        channel: 'EMAIL',
-        payload: {
-          userId,
-          type: 'CONCERT_CANCELLED',
-          data: {
-            concertId: event.concertId,
-            concertTitle: event.title,
-            message: `Rất tiếc, sự kiện "${event.title}" đã bị hủy. Vé của bạn sẽ được hoàn tiền trong thời gian sớm nhất.`,
+      await this.notificationsQueue.add(
+        'notification.send',
+        {
+          channel: 'EMAIL',
+          payload: {
+            userId,
+            type: 'CONCERT_CANCELLED',
+            data: {
+              concertId: event.concertId,
+              concertTitle: event.title,
+              message: `Rất tiếc, sự kiện "${event.title}" đã bị hủy. Vé của bạn sẽ được hoàn tiền trong thời gian sớm nhất.`,
+            },
           },
         },
-      });
+        this.emailJobOptions,
+      );
 
       // Enqueue IN_APP notification cho từng người mua
       await this.notificationsQueue.add('notification.send', {
