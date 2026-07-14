@@ -10,9 +10,10 @@
 |---|---|
 | `SẴN SÀNG` | Có thể test trên code hiện tại. |
 | `THỦ CÔNG` | Cần thao tác trình duyệt/camera/hai browser profile. |
-| `TEST SAU` | Chức năng bắt buộc chưa hoàn thiện; quay lại sau khi implement. |
 | `CẦN KEY` | Cần credential dịch vụ ngoài, không commit vào repo. |
 | `NGOÀI PHẠM VI` | Đã scope rõ trong proposal, không thuộc demo mặc định. |
+
+Sau khi chạy, ghi kết quả thực tế là `PASS` hoặc `FAIL`, kèm ngày chạy và đường dẫn screenshot/video/log. `SẴN SÀNG` chỉ có nghĩa là code và dữ liệu test đã có, không đồng nghĩa test đã pass.
 
 Không cần mọi test có bộ hồ sơ evidence riêng. Với mỗi nhóm chức năng, chỉ cần ghi `PASS/FAIL`, lưu output terminal quan trọng và screenshot/video đủ để chứng minh trong bài trình bày.
 
@@ -22,15 +23,15 @@ Không cần mọi test có bộ hồ sơ evidence riêng. Với mỗi nhóm ch�
 |---|---|
 | Docker, seed, auth, concert browsing | `SẴN SÀNG` |
 | Mock payment → QR | `SẴN SÀNG` |
-| VNPay | Optional, `CẦN KEY`; mặc định phải disabled an toàn |
+| VNPay sandbox → QR | `SẴN SÀNG`; cần credential sandbox trong `.env` |
 | MoMo | `NGOÀI PHẠM VI` bản cài đặt hiện tại |
 | In-app notification và reminder | `SẴN SÀNG` |
-| Email kèm e-ticket | `TEST SAU` |
+| Email kèm e-ticket qua Mailpit | `SẴN SÀNG`, `THỦ CÔNG` |
 | Organizer CRUD/cancel | `SẴN SÀNG` |
 | Revenue API | `SẴN SÀNG` |
-| Revenue UI chính xác | `TEST SAU` |
+| Revenue UI chính xác | `SẴN SÀNG`, `THỦ CÔNG` |
 | CSV upload thủ công | `SẴN SÀNG` |
-| CSV nhập định kỳ từ inbox | `TEST SAU` |
+| CSV nhập định kỳ từ inbox | `SẴN SÀNG` |
 | AI fallback/provider integration | `SẴN SÀNG`; demo provider thật `CẦN KEY` |
 | Scanner online/offline | `SẴN SÀNG`, cần kiểm tra `THỦ CÔNG` |
 
@@ -52,6 +53,7 @@ Không cần mọi test có bộ hồ sơ evidence riêng. Với mỗi nhóm ch�
 | Scanner | `http://localhost:5174` |
 | Backend | `http://localhost:3000` |
 | Mock gateway | `http://localhost:4000` |
+| Mailpit | `http://localhost:8025` |
 
 | Role | Email | Password |
 |---|---|---|
@@ -77,7 +79,7 @@ curl.exe http://localhost:4000/health
 curl.exe http://localhost:3000/concerts
 ```
 
-**Đạt khi:** sáu service chạy/healthy, API trả `200`, danh sách có bốn concert seed đúng đề bài.
+**Đạt khi:** cả bảy service (`postgres`, `redis`, `mailpit`, `mock-gateway`, `backend`, `web`, `scanner`) chạy/healthy, API trả `200`, danh sách có bốn concert seed đúng đề bài.
 
 ## 4. Cách sử dụng app
 
@@ -123,7 +125,7 @@ Set-Location ../mock-gateway; npm run build
 Set-Location ../..
 ```
 
-**Mong đợi:** các build pass; backend tests quan trọng pass. Lint debt cũ không phải blocker trừ khi ảnh hưởng code mới hoặc build/demo.
+**Mong đợi:** các build pass; toàn bộ backend suite pass. Baseline gần nhất của repository là 16 suite/101 test pass. Lint debt cũ không phải blocker trừ khi ảnh hưởng code mới hoặc build/demo.
 
 ## 6. Auth và RBAC
 
@@ -193,13 +195,20 @@ Reload trang success hoặc gửi lại cùng action/idempotency key.
 
 **Mong đợi:** không tạo charge/order/ticket trùng; số QR không tăng sau retry.
 
-### BUY-07 — VNPay/MoMo scope
+### BUY-07 — VNPay sandbox (`SẴN SÀNG`, `THỦ CÔNG`)
 
-- Mặc định `GET /payment/methods` phải báo VNPay disabled.
-- Nếu nhóm có credential sandbox, có thể test VNPay như phần cộng thêm.
-- MoMo không thuộc bản demo hiện tại và phải được nêu rõ trong proposal/video.
+Điều kiện: `.env` gốc có `VNPAY_ENABLED=true`, URL sandbox, TMN code/hash secret sandbox hợp lệ và `VNPAY_RETURN_URL=http://localhost:5173/vnpay-return`. Recreate backend sau khi đổi cấu hình.
 
-Không cần chứng nhận production gateway cho đồ án nếu scope đã được trình bày rõ.
+1. Gọi `GET /payment/methods`, xác nhận VNPay enabled.
+2. Audience tạo order mới và chọn VNPay.
+3. Hoàn tất giao dịch trên trang sandbox; không tái sử dụng URL thanh toán cũ.
+4. Kiểm tra return page, order, ticket, stock, notification và Mailpit.
+5. Reload return page hoặc gửi lại cùng callback hợp lệ.
+6. Trong automated/unit test, kiểm tra callback đúng chữ ký nhưng sai amount, order reference hoặc currency bị từ chối.
+
+**Mong đợi:** request dùng giờ Việt Nam và không bị báo hết hạn khi vừa tạo; callback hợp lệ chuyển order sang `PAID` đúng một lần; đúng số QR/email được tạo; callback lặp không tạo thêm order/ticket/notification; callback sai chữ ký hoặc dữ liệu bị từ chối.
+
+MoMo và VNPay production certification là `NGOÀI PHẠM VI`; mock payment vẫn được giữ để demo failure/circuit breaker có kiểm soát.
 
 ## 8. Thông báo
 
@@ -221,11 +230,15 @@ Tạo/điều chỉnh concert bắt đầu khoảng 24 giờ tới và có paid 
 
 **Mong đợi:** buyer nhận một reminder; chạy lại không tạo duplicate.
 
-### NOTIF-04 — Email kèm QR (`TEST SAU`, bắt buộc)
+### NOTIF-04 — Email kèm QR (`SẴN SÀNG`, `THỦ CÔNG`, bắt buộc)
 
-Mở lại test sau khi có Mailpit/Mailhog và email e-ticket.
+1. Hoàn tất `BUY-03` hoặc `BUY-07` với một order có nhiều ticket.
+2. Mở Mailpit tại `http://localhost:8025` và tìm email gửi tới đúng Audience.
+3. Kiểm tra buyer, concert, thời gian, ticket type và một QR riêng cho từng ticket.
+4. Đối chiếu giá trị QR/email với QR trong **Vé của tôi**, rồi quét bằng Scanner PWA.
+5. Để kiểm tra lỗi kênh, tạm làm SMTP không khả dụng và xem log/retry BullMQ; sau đó khôi phục Mailpit.
 
-**Mong đợi:** purchase tạo email local đúng user/concert và chứa QR dùng được. Chỉ cần log rõ khi gửi lỗi; không yêu cầu production delivery audit.
+**Mong đợi:** purchase tạo email local đúng người nhận và đủ e-ticket; QR quét được; lỗi email được log/retry nhưng không rollback order/ticket đã thanh toán; không yêu cầu production delivery audit.
 
 ## 9. Organizer
 
@@ -247,9 +260,9 @@ Tạo một order `PENDING` và một order `PAID`, gọi `GET /admin/concerts/:
 
 **Mong đợi:** chỉ PAID được tính vào sold/revenue; fail/expiry không được tính.
 
-### ADMIN-04 — Revenue trên UI (`TEST SAU`, bắt buộc)
+### ADMIN-04 — Revenue trên UI (`SẴN SÀNG`, `THỦ CÔNG`, bắt buộc)
 
-Sau khi UI dùng stats API, lặp `ADMIN-03` trên dashboard.
+Lặp `ADMIN-03` trên Admin Dashboard.
 
 **Mong đợi:** PENDING giảm availability nhưng không tăng doanh thu; confirm tăng đúng một lần.
 
@@ -267,16 +280,23 @@ Organizer upload lần lượt ba file.
 
 **Mong đợi:** valid rows được import; cùng nội dung bị checksum dedup; file có row lỗi vẫn nhập row hợp lệ; worker không crash.
 
-### CSV-02 — Nhập định kỳ từ inbox (`TEST SAU`, bắt buộc)
+### CSV-02 — Nhập định kỳ từ inbox (`SẴN SÀNG`, bắt buộc)
 
-Sau khi có scheduler:
+Tên file phải theo mẫu `<concert-slug>__anything.csv`. Ví dụ:
 
-1. Copy valid CSV vào mounted inbox.
-2. Không gọi HTTP upload.
-3. Chờ scheduler.
-4. Lặp với duplicate và malformed file.
+```powershell
+Copy-Item data/sample-csv/guests-valid.csv data/inbox/anh-trai-say-hi__valid.csv
+Start-Sleep -Seconds 15
+Get-ChildItem data/inbox/processed
+Get-ChildItem data/inbox/failed
+```
 
-**Mong đợi:** valid file tạo guest; duplicate được skip; malformed không làm backend ngừng; file được đưa vào processed/failed để quan sát.
+1. Không gọi HTTP upload; kiểm tra file hợp lệ được poll từ `data/inbox/` và chuyển sang `processed/`.
+2. Copy lại cùng nội dung dưới tên khác để kiểm tra checksum dedup.
+3. Thử file có row lỗi, file sai extension và filename có concert slug không tồn tại.
+4. Kiểm tra batch/guest list API và health backend trong suốt quá trình.
+
+**Mong đợi:** poller chạy khoảng mỗi 10 giây; valid rows được import; cùng checksum không tạo dữ liệu trùng; row lỗi được cô lập; file/slug không hợp lệ được đưa vào `failed/`; lỗi một file không làm backend ngừng.
 
 ## 11. AI Artist Bio
 
@@ -361,9 +381,17 @@ k6 run scripts/load-test/rate-limit.js
 
 ### TECH-03 — Payment instability/circuit breaker (`SẴN SÀNG`)
 
-Script cần backend development với `ENABLE_DEMO_ENDPOINTS=true`:
+Script cần backend development với demo endpoint. Đặt trong `.env` gốc:
+
+```env
+NODE_ENV=development
+ENABLE_DEMO_ENDPOINTS=true
+```
+
+Áp dụng cấu hình và chạy script:
 
 ```powershell
+docker compose up -d --force-recreate backend
 node scripts/load-test/circuit-breaker.js
 ```
 
@@ -381,7 +409,7 @@ node scripts/load-test/checkin-double-scan.js
 
 **Đạt khi:** một accepted, duplicate bị chặn, resend cùng client log không tạo bản ghi mới.
 
-### TECH-05 — Scheduled CSV (`TEST SAU`)
+### TECH-05 — Scheduled CSV (`SẴN SÀNG`)
 
 Dùng `CSV-02`.
 
@@ -411,19 +439,23 @@ Remove-Item Env:CONCERT_SLUG
 
 Không cần review như tài liệu production. Chỉ kiểm tra các nội dung đề yêu cầu:
 
-- [ ] Proposal: vấn đề, mục tiêu, users, scope, risks.
-- [ ] Kiến trúc tổng thể và cách các thành phần giao tiếp.
-- [ ] Mô tả ảnh hưởng khi payment/AI/email hoặc một thành phần ngoài gặp lỗi.
-- [ ] C4 Level 1 và Level 2.
-- [ ] High-level architecture diagram.
-- [ ] Database design và các entity chính.
-- [ ] Ít nhất hai business flow: purchase, offline check-in hoặc CSV ingestion.
-- [ ] RBAC cho ba role.
-- [ ] Thiết kế rate limiting, circuit breaker, idempotency và caching.
-- [ ] Notification dùng channel abstraction để có thể thêm SMS/Zalo mà không sửa luồng nghiệp vụ chính.
-- [ ] Specs có main flow, error flow, constraints và acceptance criteria.
-- [ ] README có một lệnh chạy Docker, account seed và hướng dẫn demo.
-- [ ] Không commit API key hoặc secret thật.
+- [ ] `BP01`: kiến trúc tổng thể, thành phần, giao tiếp và ảnh hưởng khi một phần lỗi.
+- [ ] `BP02`: C4 Level 1 có đủ actor và hệ thống ngoài.
+- [ ] `BP03`: C4 Level 2 có web, Scanner PWA, backend, PostgreSQL, Redis/BullMQ, payment và email.
+- [ ] `BP04`: high-level diagram nhấn mạnh payment, AI/PDF, CSV và offline check-in.
+- [ ] `BP05`: quyết định SQL/cache và schema/entity quan trọng khớp Prisma.
+- [ ] `BP06`: purchase flow từ bấm mua đến app/email/e-ticket, gồm timeout/fail/expiry/retry.
+- [ ] `BP07`: offline scan, lưu queue, reconnect, conflict và chống vào hai lần.
+- [ ] `BP08`: CSV upload/scheduled inbox, row lỗi, checksum dedup và processed/failed.
+- [ ] `BP09`: quyền Audience, Organizer, Scanner khớp `AUTH-02`.
+- [ ] `BP10`: tải 80.000 người/5 phút, 70% phút đầu, rate-limit key, fairness và `429`.
+- [ ] `BP11`: circuit breaker và graceful degradation khi payment lỗi.
+- [ ] `BP12`: idempotency key chống tạo/charge hai lần.
+- [ ] `BP13`: cache list/detail/availability có TTL và invalidation.
+- [ ] `BP14`: ADR ghi quyết định lớn và đánh đổi.
+- [ ] `BP15`: có `proposal.md`, `design.md` và `specs/*.md` liên kết nhất quán.
+- [ ] README có quick start, 7 service, account seed, sample data, sandbox/AI và hướng dẫn ba role.
+- [ ] Không commit `.env`, API key, TMN hash secret hoặc credential thật.
 
 ## 15. Regression cuối trước khi quay video
 
@@ -431,12 +463,12 @@ Từ dữ liệu sạch:
 
 1. Docker up và health.
 2. Ba role login và RBAC.
-3. Audience browse → mock purchase → QR → app/email notification.
+3. Audience browse → mock purchase và VNPay sandbox → QR → app/email notification.
 4. Organizer CRUD → stats → cancel → scheduled CSV → real AI bio.
 5. Scanner pre-download → offline scan → reconnect → conflict.
 6. Chạy bảy technical tests §13.
 
-Nếu một phần chưa implement, giữ `TEST SAU`; không đánh PASS chỉ vì unit test hoặc code tồn tại.
+Không đánh `PASS` chỉ vì unit test hoặc code tồn tại; mỗi mục bắt buộc phải có kết quả runtime/manual phù hợp.
 
 ## 16. Checklist nộp bài
 
@@ -453,25 +485,28 @@ Theo `requirements.md` §7:
 
 ## 17. Ma trận requirement → test
 
-| Yêu cầu | Test |
-|---|---|
-| Concert, nghệ sĩ, venue, SVG, remaining | `BUY-01`, `BUY-02` |
-| Chọn vé, thanh toán, QR | `BUY-03`, `BUY-04`, `BUY-06` |
-| Max-per-user | `BUY-05`, `TECH-06` |
-| App/email notification và reminder | `NOTIF-01..04` |
-| Organizer CRUD/cancel/revenue | `ADMIN-01..04` |
-| RBAC ba role | `AUTH-02`, `SCAN-01` |
-| Scanner offline và double-scan | `SCAN-01..05`, `TECH-04` |
-| AI bio từ PDF | `AI-01`, `AI-02` |
-| CSV định kỳ | `CSV-01`, `CSV-02`, `TECH-05` |
-| Race condition | `TECH-01` |
-| High traffic protection | `TECH-02` |
-| Payment instability/no double charge | `TECH-03`, `BUY-06` |
-| Per-user concurrency | `TECH-06` |
-| Read-heavy caching | `TECH-07` |
-| Blueprint | §14 |
-| Chạy được, seed data | `RUN-01`, `RUN-02` |
-| Hồ sơ nộp | §16 |
+| Mã | Yêu cầu | Test/bằng chứng |
+|---|---|---|
+| `IM01` | Concert, artist, venue, SVG, remaining | `BUY-01`, `BUY-02` |
+| `IM02` | Chọn vé, payment, QR e-ticket | `BUY-03`, `BUY-04`, `BUY-07` |
+| `IM03` | Max-per-user kể cả concurrent request | `BUY-05`, `TECH-06` |
+| `IM04` | App/email sau mua và reminder 24 giờ | `NOTIF-01..04` |
+| `IM05` | Organizer CRUD/cancel/ticket type/revenue | `ADMIN-01..04` |
+| `IM06` | RBAC API, web và scanner | `AUTH-02`, `SCAN-01` |
+| `IM07` | Mobile scanner quét/xác nhận QR | `SCAN-01`, `SCAN-03` |
+| `IM08` | Offline queue, reconnect và double-scan | `SCAN-02..05`, `TECH-04` |
+| `IM09` | AI bio từ PDF | `AI-01`, `AI-02` |
+| `IM10` | Scheduled Guest List CSV | `CSV-01`, `CSV-02`, `TECH-05` |
+| `IM11` | Không oversell | `TECH-01` |
+| `IM12` | Rate limiting/bot-fairness | `TECH-02` |
+| `IM13` | Circuit breaker/graceful degradation | `TECH-03`, `BUY-04` |
+| `IM14` | Idempotency/no double charge | `BUY-06`, `BUY-07`, `TECH-03` |
+| `IM15` | Cache TTL/invalidation | `TECH-07`, `BUY-02` |
+| `IM16` | Clone và chạy theo README | `RUN-01`, §14 |
+| `IM17` | 4 concert và dữ liệu seed | `RUN-01`, `BUY-01` |
+| `IM18` | Toàn hệ thống chạy theo Blueprint | §15 regression cuối |
+| `BP01–BP15` | Blueprint bắt buộc/khuyến nghị | Checklist §14 |
+| Nộp bài | Drive, video và file link | Checklist §16 |
 
 ## 18. Những thứ không bắt buộc test
 
