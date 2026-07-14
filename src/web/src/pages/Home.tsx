@@ -26,7 +26,11 @@ export default function Home() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '25px' }}>
           {concerts.map((c: any) => (
             <div key={c.id} style={{ border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-              <div style={{ height: '150px', background: 'linear-gradient(to right, #3b82f6, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold' }}>Image Placeholder</div>
+              {c.imageUrl ? (
+                <img src={c.imageUrl} alt={c.title} style={{ width: '100%', height: '150px', objectFit: 'cover', display: 'block' }} />
+              ) : (
+                <div style={{ height: '150px', background: 'linear-gradient(to right, #3b82f6, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold' }}>Image Placeholder</div>
+              )}
               <div style={{ padding: '20px' }}>
                 <h3 style={{ fontSize: '1.25rem', marginBottom: '10px', color: '#111827' }}>{c.title}</h3>
                 <p style={{ color: '#4b5563', marginBottom: '5px', fontSize: '0.9rem' }}>{c.venue}</p>

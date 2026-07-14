@@ -66,7 +66,7 @@ export default function LoginView({ onLoggedIn }: Props) {
     <div style={{ minHeight: '100vh', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui, sans-serif', padding: '20px' }}>
       <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', padding: '30px', width: '100%', maxWidth: '380px' }}>
         <h1 style={{ margin: '0 0 6px 0', fontSize: '1.4rem', color: '#111827', fontWeight: 800, textAlign: 'center' }}>🎫 TB Scanner</h1>
-        <p style={{ margin: '0 0 20px 0', color: '#6b7280', textAlign: 'center', fontSize: '0.9rem' }}>Đăng nhập bằng tài khoản soát vé</p>
+        <p style={{ margin: '0 0 20px 0', color: '#000000ff', textAlign: 'center', fontSize: '0.9rem' }}>Đăng nhập bằng tài khoản soát vé</p>
 
         {!isOnline && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: '8px', padding: '10px 12px', marginBottom: '15px', fontSize: '0.9rem' }}>

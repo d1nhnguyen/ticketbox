@@ -24,6 +24,7 @@ export default function Dashboard() {
     startsAt: '',
     slug: '',
     status: 'ON_SALE',
+    imageUrl: '',
   });
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState('');
@@ -71,14 +72,21 @@ export default function Dashboard() {
     fetchAdminData();
   }, [token]);
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, status: string) => {
     if (!window.confirm('Bạn có chắc chắn muốn hủy sự kiện này? Hành động này không thể hoàn tác.')) return;
 
     try {
-      await apiClient.delete(`/admin/concerts/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setConcerts(concerts.filter((c) => c.id !== id));
+      if (status === 'DRAFT') {
+        await apiClient.delete(`/admin/concerts/${id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setConcerts(concerts.filter((c) => c.id !== id));
+      } else {
+        await apiClient.post(`/admin/concerts/${id}/cancel`, {}, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setConcerts(concerts.map((c) => c.id === id ? { ...c, status: 'CANCELLED' } : c));
+      }
       alert('Đã hủy sự kiện thành công!');
     } catch {
       alert('Lỗi khi hủy sự kiện. Vui lòng kiểm tra lại quyền hoặc thử lại sau.');
@@ -98,6 +106,41 @@ export default function Dashboard() {
     setCreateForm((prev) => ({ ...prev, title: value, slug }));
   };
 
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    setIsUploadingImage(true);
+    try {
+      const res = await apiClient.post('/admin/upload/image', formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      // apiClient configuration prepends API URL, so we construct the absolute URL
+      // Actually, if backend returns relative /uploads/..., we can use it directly if served from backend
+      // But we need the full API URL for static assets if frontend and backend are separate
+      // Let's use the env variable or just relative if using proxy
+      // The frontend uses VITE_API_URL. Let's get the base url from client.ts or construct it.
+      // Easiest is to let backend return relative path and frontend prepend API URL or just use it if same domain.
+      // Since it's localhost:3000, we prepend the base URL
+      const imageUrl = `${import.meta.env.VITE_API_URL}${res.data.imageUrl}`;
+      setCreateForm((prev) => ({ ...prev, imageUrl }));
+    } catch (err: any) {
+      alert('Lỗi khi tải ảnh lên: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setIsUploadingImage(false);
+      // reset input
+      e.target.value = '';
+    }
+  };
+
   const handleCreateSubmit = async () => {
     const { title, venue, startsAt, slug } = createForm;
     if (!title || !venue || !startsAt || !slug) {
@@ -112,11 +155,11 @@ export default function Dashboard() {
     try {
       await apiClient.post(
         '/admin/concerts',
-        { title, venue, startsAt: new Date(startsAt).toISOString(), slug, status: createForm.status },
+        { title, venue, startsAt: new Date(startsAt).toISOString(), slug, status: createForm.status, imageUrl: createForm.imageUrl || undefined },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setCreateSuccess(`✅ Đã tạo concert "${title}" thành công!`);
-      setCreateForm({ title: '', venue: '', startsAt: '', slug: '', status: 'ON_SALE' });
+      setCreateForm({ title: '', venue: '', startsAt: '', slug: '', status: 'ON_SALE', imageUrl: '' });
       setShowCreateForm(false);
       await fetchAdminData(); // Refresh list
     } catch (err: any) {
@@ -314,6 +357,37 @@ export default function Dashboard() {
                 }}
               />
             </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={{ display: 'block', fontWeight: 600, color: '#374151', marginBottom: '6px', fontSize: '0.9rem' }}>
+                Ảnh bìa (Tải lên hoặc dán Link)
+              </label>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <input
+                  type="text"
+                  placeholder="VD: https://images.unsplash.com/photo-xxx"
+                  value={createForm.imageUrl}
+                  onChange={(e) => setCreateForm((prev) => ({ ...prev, imageUrl: e.target.value }))}
+                  style={{
+                    flex: 1, padding: '10px 14px', borderRadius: '8px',
+                    border: '1.5px solid #d1d5db', fontSize: '0.95rem', outline: 'none',
+                    background: '#fafafa', color: '#111827'
+                  }}
+                />
+                <label style={{
+                  padding: '10px 16px', background: '#3b82f6', color: 'white', borderRadius: '8px',
+                  cursor: isUploadingImage ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '0.9rem',
+                  opacity: isUploadingImage ? 0.7 : 1, whiteSpace: 'nowrap'
+                }}>
+                  {isUploadingImage ? 'Đang tải...' : 'Browse...'}
+                  <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} disabled={isUploadingImage} />
+                </label>
+              </div>
+              {createForm.imageUrl && (
+                <div style={{ marginTop: '10px' }}>
+                  <img src={createForm.imageUrl} alt="Preview" style={{ height: '100px', borderRadius: '8px', objectFit: 'cover' }} />
+                </div>
+              )}
+            </div>
             <div>
               <label style={{ display: 'block', fontWeight: 600, color: '#374151', marginBottom: '6px', fontSize: '0.9rem' }}>
                 Trạng thái *
@@ -350,7 +424,7 @@ export default function Dashboard() {
               {isCreating ? '⏳ Đang lưu...' : '💾 Lưu sự kiện'}
             </button>
             <button
-              onClick={() => { setShowCreateForm(false); setCreateError(''); setCreateForm({ title: '', venue: '', startsAt: '', slug: '', status: 'ON_SALE' }); }}
+              onClick={() => { setShowCreateForm(false); setCreateError(''); setCreateForm({ title: '', venue: '', startsAt: '', slug: '', status: 'ON_SALE', imageUrl: '' }); }}
               style={{
                 padding: '12px 24px', background: 'white', color: '#6b7280',
                 border: '1.5px solid #d1d5db', borderRadius: '8px',
@@ -427,10 +501,14 @@ export default function Dashboard() {
                     🔍 Chi tiết
                   </button>
                   <button
-                    onClick={() => handleDelete(c.id)}
+                    onClick={() => handleDelete(c.id, c.status)}
+                    disabled={c.status === 'CANCELLED'}
                     style={{
-                      background: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca',
-                      padding: '6px 12px', borderRadius: '6px', cursor: 'pointer',
+                      background: c.status === 'CANCELLED' ? '#f3f4f6' : '#fee2e2', 
+                      color: c.status === 'CANCELLED' ? '#9ca3af' : '#dc2626', 
+                      border: c.status === 'CANCELLED' ? '1px solid #e5e7eb' : '1px solid #fecaca',
+                      padding: '6px 12px', borderRadius: '6px', 
+                      cursor: c.status === 'CANCELLED' ? 'not-allowed' : 'pointer',
                       fontSize: '0.85rem', fontWeight: 500
                     }}
                   >

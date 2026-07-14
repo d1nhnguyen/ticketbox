@@ -5,6 +5,7 @@ import { RedisModule } from './redis/redis.module';
 import { CacheModule } from './cache/cache.module';
 import { RateLimitService } from './redis/rate-limit.service';
 import { RateLimitGuard } from './guards/rate-limit.guard';
+import { UploadController } from './upload.controller';
 
 /**
  * CommonModule: provides shared infrastructure across all feature modules.
@@ -15,6 +16,7 @@ import { RateLimitGuard } from './guards/rate-limit.guard';
  */
 @Module({
   imports: [ConfigModule, RedisModule, CacheModule],
+  controllers: [UploadController],
   providers: [
     RateLimitService,
     {

@@ -44,4 +44,8 @@ export class CreateConcertDto {
   @IsOptional()
   @IsString()
   seatMapSvg?: string;
+
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
 }

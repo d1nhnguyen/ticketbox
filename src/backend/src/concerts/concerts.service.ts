@@ -57,6 +57,7 @@ export class ConcertsService {
             venue: true,
             startsAt: true,
             status: true,
+            imageUrl: true,
           },
           orderBy: { startsAt: 'asc' },
         }),
@@ -132,6 +133,7 @@ export class ConcertsService {
         artistBio: true,
         artists: true,
         seatMapSvg: true,
+        imageUrl: true,
         createdAt: true,
         ticketTypes: {
           select: {
@@ -174,6 +176,7 @@ export class ConcertsService {
           artists: dto.artists ?? [],
           bioSourceUrl: dto.bioSourceUrl,
           seatMapSvg: dto.seatMapSvg,
+          imageUrl: dto.imageUrl,
         },
       });
       // Invalidate list cache so audience sees the new concert immediately
@@ -202,6 +205,7 @@ export class ConcertsService {
           ...(dto.artists !== undefined && { artists: dto.artists }),
           ...(dto.bioSourceUrl !== undefined && { bioSourceUrl: dto.bioSourceUrl }),
           ...(dto.seatMapSvg !== undefined && { seatMapSvg: dto.seatMapSvg }),
+          ...(dto.imageUrl !== undefined && { imageUrl: dto.imageUrl }),
         },
       });
       // Invalidate both detail (old slug) and list cache

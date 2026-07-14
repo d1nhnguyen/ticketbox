@@ -41,6 +41,7 @@ interface Concert {
   startsAt: string;
   status: string;
   artistBio?: string;
+  imageUrl?: string | null;
   ticketTypes: TicketType[];
 }
 
@@ -85,7 +86,7 @@ export default function AdminConcertDetail() {
   const [activeTab, setActiveTab] = useState<'tickets' | 'bio' | 'guests' | 'info'>('tickets');
 
   // ── Edit Concert Info ─────────────────────────────────────────────────────
-  const [editForm, setEditForm] = useState({ title: '', venue: '', startsAt: '', slug: '', status: '' });
+  const [editForm, setEditForm] = useState({ title: '', venue: '', startsAt: '', slug: '', status: '', imageUrl: '' });
   const [isSavingInfo, setIsSavingInfo] = useState(false);
   const [infoError, setInfoError] = useState('');
   const [infoSuccess, setInfoSuccess] = useState('');
@@ -127,6 +128,7 @@ export default function AdminConcertDetail() {
         startsAt: res.data.startsAt ? res.data.startsAt.slice(0, 16) : '',
         slug: res.data.slug,
         status: res.data.status,
+        imageUrl: res.data.imageUrl || '',
       });
     } catch {
       navigate('/admin');
@@ -228,6 +230,33 @@ export default function AdminConcertDetail() {
 
   // ── Edit Concert Info handler ─────────────────────────────────────────────
 
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    setIsUploadingImage(true);
+    try {
+      const res = await apiClient.post('/admin/upload/image', formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      const imageUrl = `${import.meta.env.VITE_API_URL}${res.data.imageUrl}`;
+      setEditForm((prev) => ({ ...prev, imageUrl }));
+    } catch (err: any) {
+      alert('Lỗi khi tải ảnh lên: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setIsUploadingImage(false);
+      e.target.value = '';
+    }
+  };
+
   const handleUpdateConcert = async () => {
     if (!editForm.title || !editForm.venue || !editForm.startsAt || !editForm.slug) {
       setInfoError('Vui lòng điền đầy đủ tất cả các trường bắt buộc.'); return;
@@ -242,6 +271,7 @@ export default function AdminConcertDetail() {
           startsAt: new Date(editForm.startsAt).toISOString(),
           slug: editForm.slug,
           status: editForm.status,
+          imageUrl: editForm.imageUrl || undefined,
         },
         { headers: authHeader }
       );
@@ -455,6 +485,30 @@ export default function AdminConcertDetail() {
                   onChange={e => setEditForm(p => ({ ...p, slug: e.target.value }))}
                 />
               </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', color: '#374151', marginBottom: '6px' }}>Ảnh bìa (Tải lên hoặc dán Link)</label>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <input
+                    style={{ ...inputStyle, flex: 1 }}
+                    placeholder="VD: https://images.unsplash.com/photo-xxx"
+                    value={editForm.imageUrl}
+                    onChange={e => setEditForm(p => ({ ...p, imageUrl: e.target.value }))}
+                  />
+                  <label style={{
+                    padding: '9px 16px', background: '#3b82f6', color: 'white', borderRadius: '8px',
+                    cursor: isUploadingImage ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '0.9rem',
+                    opacity: isUploadingImage ? 0.7 : 1, whiteSpace: 'nowrap'
+                  }}>
+                    {isUploadingImage ? 'Đang tải...' : 'Browse...'}
+                    <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} disabled={isUploadingImage} />
+                  </label>
+                </div>
+                {editForm.imageUrl && (
+                  <div style={{ marginTop: '10px' }}>
+                    <img src={editForm.imageUrl} alt="Preview" style={{ height: '100px', borderRadius: '8px', objectFit: 'cover' }} />
+                  </div>
+                )}
+              </div>
               <div>
                 <label style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', color: '#374151', marginBottom: '6px' }}>Trạng thái *</label>
                 <select
@@ -486,7 +540,7 @@ export default function AdminConcertDetail() {
               <button
                 onClick={() => {
                   if (!concert) return;
-                  setEditForm({ title: concert.title, venue: concert.venue, startsAt: concert.startsAt.slice(0, 16), slug: concert.slug, status: concert.status });
+                  setEditForm({ title: concert.title, venue: concert.venue, startsAt: concert.startsAt.slice(0, 16), slug: concert.slug, status: concert.status, imageUrl: concert.imageUrl || '' });
                   setInfoError(''); setInfoSuccess('');
                 }}
                 style={{ padding: '11px 20px', border: '1.5px solid #d1d5db', borderRadius: '9px', background: 'white', color: '#6b7280', fontWeight: 600, cursor: 'pointer', fontSize: '0.9rem' }}

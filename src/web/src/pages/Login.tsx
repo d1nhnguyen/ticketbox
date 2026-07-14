@@ -21,10 +21,10 @@ export default function Login() {
 
       const payloadBase64 = token.split('.')[1];
       const decodedPayload = JSON.parse(atob(payloadBase64));
-      const role = decodedPayload.role; 
-      
+      const role = decodedPayload.role;
+
       login(token, role);
-      
+
       if (role === 'ORGANIZER') navigate('/admin');
       else if (role === 'SCANNER') navigate('/scanner');
       else navigate('/');
@@ -38,7 +38,7 @@ export default function Login() {
   return (
     <div style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ background: 'white', padding: '40px', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', width: '100%', maxWidth: '400px' }}>
-        <h2 style={{ textAlign: 'center', marginBottom: '10px', fontSize: '1.8rem' }}>Đăng nhập</h2>
+        <h2 style={{ textAlign: 'center', marginBottom: '10px', fontSize: '1.8rem', color: '#000000ff' }}>Đăng nhập</h2>
         <p style={{ textAlign: 'center', color: '#6b7280', marginBottom: '30px' }}>Đăng nhập bằng tài khoản seed data</p>
         {error && <div style={{ background: '#fee2e2', color: '#b91c1c', padding: '10px', borderRadius: '6px', marginBottom: '20px', fontSize: '0.9rem' }}>{error}</div>}
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>

@@ -217,7 +217,7 @@ export class OrdersService implements OnModuleInit {
     }
 
     // ---- success → issue tickets (idempotent via conditional flip) ----
-    const paid = await this.prisma.$transaction(async (tx) => {
+    const { paid, isNew } = await this.prisma.$transaction(async (tx) => {
       // conditional flip = idempotency guard: a duplicate/concurrent confirm flips 0 rows and skips re-issuing
       const flip = await tx.order.updateMany({
         where: { id: orderId, status: OrderStatus.PENDING },
@@ -225,7 +225,7 @@ export class OrdersService implements OnModuleInit {
       });
 
       if (flip.count === 0) {
-        return tx.order.findUnique({
+        const order = await tx.order.findUnique({
           where: { id: orderId },
           include: {
             tickets: { include: { ticketType: true } },
@@ -233,6 +233,7 @@ export class OrdersService implements OnModuleInit {
             concert: true,
           },
         });
+        return { paid: order, isNew: false };
       }
 
       const items = await tx.orderItem.findMany({ where: { orderId } });
@@ -248,7 +249,7 @@ export class OrdersService implements OnModuleInit {
         }
       }
 
-      return tx.order.findUnique({
+      const order = await tx.order.findUnique({
         where: { id: orderId },
         include: {
           tickets: { include: { ticketType: true } },
@@ -256,9 +257,12 @@ export class OrdersService implements OnModuleInit {
           concert: true,
         },
       });
+      return { paid: order, isNew: true };
     });
 
-    this.eventEmitter.emit('order.paid', paid);
+    if (isNew && paid) {
+      this.eventEmitter.emit('order.paid', paid);
+    }
     return paid;
   }
 
@@ -280,14 +284,14 @@ export class OrdersService implements OnModuleInit {
    * Flips status to PAID and issues tickets idempotently.
    */
   async fulfillOrder(orderId: string) {
-    const paid = await this.prisma.$transaction(async (tx) => {
+    const { paid, isNew } = await this.prisma.$transaction(async (tx) => {
       const flip = await tx.order.updateMany({
         where: { id: orderId, status: OrderStatus.PENDING },
         data: { status: OrderStatus.PAID },
       });
 
       if (flip.count === 0) {
-        return tx.order.findUnique({
+        const order = await tx.order.findUnique({
           where: { id: orderId },
           include: {
             tickets: { include: { ticketType: true } },
@@ -295,6 +299,7 @@ export class OrdersService implements OnModuleInit {
             concert: true,
           },
         });
+        return { paid: order, isNew: false };
       }
 
       const items = await tx.orderItem.findMany({ where: { orderId } });
@@ -310,7 +315,7 @@ export class OrdersService implements OnModuleInit {
         }
       }
 
-      return tx.order.findUnique({
+      const order = await tx.order.findUnique({
         where: { id: orderId },
         include: {
           tickets: { include: { ticketType: true } },
@@ -318,9 +323,10 @@ export class OrdersService implements OnModuleInit {
           concert: true,
         },
       });
+      return { paid: order, isNew: true };
     });
 
-    if (paid) {
+    if (isNew && paid) {
       this.eventEmitter.emit('order.paid', paid);
     }
     return paid;
