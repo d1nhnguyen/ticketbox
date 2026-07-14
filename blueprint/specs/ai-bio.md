@@ -1,26 +1,35 @@
-# AI Bio Spec
+# Đặc tả tạo tiểu sử nghệ sĩ bằng AI
 
-## 1. Description
-A feature allowing Organizers to upload a PDF press-kit to extract the artist bio, leverage Generative AI (Anthropic, Gemini, or OpenAI) to summarize it, and save the polished bio against a concert.
+## 1. Mô tả
 
-## 2. Main Flow
-1. **Upload**: Organizer uploads a PDF file via `POST /concerts/:id/upload-bio` on the Admin UI.
-2. **Text Extraction**: The server uses `pdf-parse` to extract raw text from the uploaded PDF buffer locally.
-3. **AI Provider Selection**: Based on the `AI_PROVIDER` environment variable, the system uses the `AiFactory` to instantiate the appropriate provider client (Anthropic, Gemini, or OpenAI).
-4. **AI Generation**: The server sends the extracted text to the AI API with a prompt asking for a concise, engaging summary of the artist's biography in Markdown format.
-5. **Persistence**: The generated Markdown text is saved to `Concert.artistBio` in PostgreSQL.
-6. **Display**: The generated bio is rendered in the `ConcertDetail` page for the audience.
+Ban tổ chức tải press kit dạng PDF; backend trích xuất văn bản, gửi prompt tiếng Việt đến nhà cung cấp AI đã cấu hình và lưu kết quả vào `Concert.artistBio`. Mã nguồn nằm trong `src/backend/src/ai-bio/`.
 
-## 3. Error Scenarios
-- **PDF Parse Error**: (e.g., corrupted file or password-protected) Returns `400 Bad Request`.
-- **AI Timeout/Rate Limit**: The AI API might timeout. The backend catches the error, logs it, and returns a `500` or `502` to the Admin UI with a clear error message.
-- **Missing API Keys**: If `AI_PROVIDER` or the required key is missing, the system gracefully falls back to inserting a placeholder text ("Tiểu sử đang được cập nhật...") instead of crashing.
+## 2. Luồng chính
 
-## 4. Constraints
-- **Asynchronous/Long Polling**: AI generation can take 5-15 seconds. The current implementation blocks the HTTP request and waits for the AI response. For scaling, this could be refactored to BullMQ, but it's acceptable for Admin usage.
-- **Agnostic Architecture**: The system must be able to switch between Anthropic, Gemini, and OpenAI purely via `.env` without code changes.
+1. `ORGANIZER` gửi file PDF bằng multipart field `pdf` tới `POST /concerts/:id/bio`.
+2. Controller kiểm tra loại file và giới hạn tối đa 20 MB.
+3. `pdf-parse` trích xuất, chuẩn hóa và cắt nội dung còn tối đa 8.000 ký tự.
+4. `AI_PROVIDER` chọn một trong `anthropic`, `gemini`, `openai`; `AI_MODEL` có thể ghi đè model mặc định.
+5. Backend gọi REST API tương ứng với prompt yêu cầu viết 4–5 câu tiếng Việt.
+6. Kết quả được lưu vào `Concert.artistBio` và trả về dưới dạng `{ bio }`; trang chi tiết concert hiển thị nội dung này.
 
-## 5. Acceptance Criteria
-- Uploading a valid `artist-presskit.pdf` successfully calls the AI provider and updates `Concert.artistBio`.
-- Changing `AI_PROVIDER` in `.env` seamlessly switches the underlying AI model used.
-- The UI gracefully shows a loading spinner during the AI wait time.
+## 3. Kịch bản lỗi
+
+- Thiếu file, sai định dạng, PDF hỏng/khóa mật khẩu hoặc không có văn bản → `400 Bad Request`.
+- Concert không tồn tại → hiện trả `400 Bad Request` từ `AiBioService`.
+- Thiếu API key, provider lỗi, timeout hoặc bị giới hạn tần suất → backend ghi log và tạo nội dung dự phòng từ 200 ký tự đầu của PDF; request không làm tiến trình bị sập.
+- File trên 20 MB → Multer từ chối upload.
+
+## 4. Ràng buộc
+
+- Request hiện chờ đồng bộ phản hồi AI; chưa đưa tác vụ này vào BullMQ.
+- Chuyển provider chỉ bằng biến môi trường, không sửa mã nguồn.
+- Nội dung PDF gửi ra dịch vụ AI bên thứ ba, vì vậy dữ liệu nhạy cảm phải được xem xét trước khi upload.
+- Các model mặc định trong code hiện là `claude-haiku-4-5-20251001`, `gemini-3.1-flash-lite` và `gpt-4o-mini`; có thể đổi bằng `AI_MODEL`.
+
+## 5. Tiêu chí chấp nhận
+
+- Upload PDF hợp lệ bằng tài khoản `ORGANIZER` cập nhật `Concert.artistBio` và trả `{ bio }`.
+- Đổi `AI_PROVIDER` cùng API key phù hợp sẽ chuyển nhà cung cấp.
+- Khi không có key hoặc API AI lỗi, hệ thống lưu nội dung dự phòng thay vì crash.
+- `AUDIENCE` hoặc `SCANNER` gọi endpoint → `403`; không đăng nhập → `401`.

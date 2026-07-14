@@ -1,29 +1,34 @@
-# Notifications Spec
+# Đặc tả thông báo
 
-## 1. Description
-System for dispatching email and in-app notifications asynchronously using BullMQ. Includes an automated 24-h cron job to send reminders. The notification system uses the Strategy pattern to easily extend channels in the future (e.g., Zalo, SMS).
+## 1. Mô tả
 
-## 2. Main Flow
-1. **Event Trigger**: Domain events (e.g., `order.paid`, `concert.cancelled`) are intercepted by `NotificationsListener`.
-2. **Job Enqueue**: The listener enqueues `notification.send` jobs into BullMQ for the required channels (e.g., `EMAIL`, `IN_APP`).
-3. **Processing**: `NotificationsProcessor` consumes the job and uses `NotificationChannelFactory` to get the correct Strategy implementation.
-4. **Delivery**: 
-   - `InAppChannel`: Saves the notification payload to PostgreSQL.
-   - `EmailChannel`: Renders HTML templates (based on `payload.type`) and sends real emails via Nodemailer/SMTP.
-5. **Reminder Cron**: `@Cron('*/15 * * * *')` runs every 15 minutes to find concerts starting in exactly 24 hours. It enqueues reminder notifications for all `PAID` users.
+Hệ thống gửi email và thông báo trong ứng dụng bất đồng bộ qua BullMQ. Hai kênh hiện tại triển khai chung giao diện `NotificationChannel`: `EmailChannel` dùng Nodemailer/SMTP và `InAppChannel` ghi PostgreSQL. Trong Docker Compose, Mailpit nhận email phát triển tại cổng SMTP `1025` và hiển thị giao diện ở `http://localhost:8025`.
 
-## 3. Error Scenarios
-- **Worker Crash**: If the server restarts or crashes during email sending, BullMQ will retry the job.
-- **Provider API Error (e.g., SMTP down)**: The job throws an error, causing BullMQ to mark it as `FAILED` and retry with exponential backoff (up to configured limits).
-- **Unknown Event Type**: Falls back to a generic notification template.
+## 2. Luồng chính
 
-## 4. Constraints
-- **Asynchronous Execution**: Notifications must not block the HTTP request/response cycle.
-- **Extensibility**: Adding a new channel must only require adding a new class implementing `NotificationChannel` and registering it in the factory.
-- **Idempotency (Cron)**: The reminder cron must not send duplicates to the same user for the same concert. Checked via `Notification` table records or BullMQ `jobId` hashing.
+1. `NotificationsListener` nhận sự kiện `order.paid` hoặc `concert.cancelled` từ `EventEmitter2`.
+2. Listener đưa job `notification.send` vào queue `notifications` cho từng kênh `EMAIL` và `IN_APP`.
+3. `NotificationsProcessor` lấy job và gọi `NotificationsService`, service chọn channel từ map chiến lược.
+4. `EmailChannel` lấy email người nhận, dựng HTML; email đơn đã thanh toán đính kèm QR PNG cho từng vé. `InAppChannel` tạo bản ghi `Notification` ở trạng thái `SENT`.
+5. Cron `*/15 * * * *` quét concert `ON_SALE` trong cửa sổ từ 23 giờ 45 đến 24 giờ 15, rồi gọi `enqueueOnce` để tạo thông báo `REMINDER_24H` trong ứng dụng cho các đơn `PAID`.
 
-## 5. Acceptance Criteria
-- A successful purchase creates an `IN_APP` notification visible in the Audience Dashboard.
-- A successful purchase sends an email with the subject "Xác nhận đặt vé TicketBox thành công!".
-- Cancelling a concert sends an email notifying all `PAID` buyers.
-- The cron correctly sweeps and creates reminder notifications for concerts exactly 24 hours away.
+## 3. Kịch bản lỗi
+
+- Email SMTP lỗi hoặc worker gặp lỗi → job email được thử lại tối đa 3 lần với exponential backoff.
+- Không tìm thấy người nhận, đơn `PAID` hoặc vé đã phát hành khi dựng email → job lỗi để BullMQ retry.
+- Channel không đăng ký → service ghi cảnh báo và bỏ qua.
+- Tiến trình backend khởi động lại → job bền vững còn trong Redis sẽ tiếp tục được xử lý.
+
+## 4. Ràng buộc
+
+- Gửi thông báo không được chặn request nghiệp vụ tạo/hủy đơn.
+- Thêm channel mới cần triển khai `NotificationChannel` và đăng ký trong `NotificationsService`.
+- Nhắc lịch chống trùng bằng truy vấn `Notification(userId, type, payload.concertId)` trước khi enqueue. Đây là kiểm tra ở tầng ứng dụng, chưa có unique constraint DB nên nhiều instance cron đồng thời vẫn có thể tạo race condition.
+- Worker thông báo hiện nằm trong cùng tiến trình NestJS backend, không phải service triển khai riêng.
+
+## 5. Tiêu chí chấp nhận
+
+- Thanh toán thành công tạo thông báo `IN_APP` và gửi email chứa thông tin đơn cùng QR vé.
+- Hủy concert gửi email và thông báo trong ứng dụng cho từng người mua có đơn `PAID`.
+- Cron chỉ nhắc concert `ON_SALE` trong cửa sổ 24 giờ và không tạo lại khi bản ghi tương ứng đã tồn tại.
+- Email có thể quan sát trong Mailpit ở môi trường Docker Compose.

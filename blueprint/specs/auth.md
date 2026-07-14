@@ -1,82 +1,65 @@
-# Auth & RBAC Spec
+# Đặc tả xác thực và phân quyền RBAC
 
-## Description
+## Mô tả
 
-Stateless authentication with JWT bearer tokens and role-based access control (RBAC) for
-the three roles: `AUDIENCE`, `ORGANIZER`, `SCANNER`. Passwords are hashed with bcrypt and
-never stored or returned in plaintext. The signed JWT carries `{ sub, email, role }`, so
-every request is authorized without a session/DB lookup. Endpoints opt into protection
-declaratively with `@UseGuards(JwtAuthGuard, RolesGuard)` + `@Roles(...)`.
+Hệ thống sử dụng JWT Bearer không trạng thái và phân quyền theo vai trò (RBAC) với ba vai trò: `AUDIENCE`, `ORGANIZER`, `SCANNER`. Mật khẩu được băm bằng bcrypt và không bao giờ được lưu hay trả về ở dạng văn bản thuần. JWT mang payload `{ sub, email, role }`; các endpoint khai báo bảo vệ bằng `@UseGuards(JwtAuthGuard, RolesGuard)` và `@Roles(...)`.
 
-Implemented in `src/backend/src/auth/`.
+Mã nguồn nằm tại `src/backend/src/auth/`.
 
-## Main Flow
+## Luồng chính
 
 ```mermaid
 sequenceDiagram
-  participant C as Client
+  participant C as Máy khách
   participant API as AuthController
   participant S as AuthService
   participant DB as PostgreSQL
-  C->>API: POST /auth/register { email, password, role? }
+  C->>API: POST /auth/register { email, password }
   API->>S: register()
   S->>DB: findUnique(email)
-  alt email free
+  alt Email chưa tồn tại
     S->>S: bcrypt.hash(password)
-    S->>DB: create user (role default AUDIENCE)
+    S->>DB: Tạo User với role AUDIENCE
     S-->>C: 201 { id, email, role }
-  else email taken
+  else Email đã tồn tại
     S-->>C: 400 Bad Request
   end
   C->>API: POST /auth/login { email, password }
   API->>S: login()
   S->>DB: findUnique(email)
   S->>S: bcrypt.compare(password, passwordHash)
-  S-->>C: { access_token } (JWT)
+  S-->>C: { access_token }
   C->>API: GET /protected (Bearer token)
   Note over API: JwtAuthGuard → JwtStrategy.validate → req.user
-  Note over API: RolesGuard compares @Roles() to user.role
-  API-->>C: 200 (allowed) / 403 (wrong role)
+  Note over API: RolesGuard đối chiếu @Roles() với user.role
+  API-->>C: 200 (được phép) / 403 (sai vai trò)
 ```
 
-1. **Register** — `POST /auth/register` with `{ email, password, role? }`. Service rejects
-   duplicate emails, bcrypt-hashes the password (salt generated per user), stores the
-   `User`, and returns `{ id, email, role }` (no hash). `role` defaults to `AUDIENCE`.
-2. **Login** — `POST /auth/login` with `{ email, password }`. Service loads the user by
-   email, `bcrypt.compare`s the password, then signs a JWT `{ sub: user.id, email, role }`
-   and returns `{ access_token }`.
-3. **Authenticated request** — client sends `Authorization: Bearer <token>`. `JwtAuthGuard`
-   (Passport `'jwt'`) triggers `JwtStrategy`, which verifies signature + expiry against
-   `JWT_SECRET` and attaches `{ userId, email, role }` to `req.user`.
-4. **Authorization** — `RolesGuard` reads `@Roles(...)` metadata via `Reflector`. No
-   metadata → any authenticated user passes. Otherwise the request passes only if
-   `user.role` is in the required set.
+1. **Đăng ký:** `POST /auth/register` nhận `{ email, password }`. Service từ chối email trùng, băm mật khẩu với salt riêng rồi tạo người dùng. Vì lý do an toàn, tự đăng ký luôn gán vai trò `AUDIENCE`; tài khoản `ORGANIZER` và `SCANNER` được cấp sẵn bằng seed hoặc quy trình quản trị.
+2. **Đăng nhập:** `POST /auth/login` nhận `{ email, password }`, so sánh mật khẩu bằng bcrypt, ký JWT `{ sub: user.id, email, role }` và trả `{ access_token }`.
+3. **Yêu cầu đã xác thực:** Máy khách gửi `Authorization: Bearer <token>`. `JwtAuthGuard` gọi `JwtStrategy` để kiểm tra chữ ký, hạn dùng bằng `JWT_SECRET`, rồi gắn `{ userId, email, role }` vào `req.user`.
+4. **Phân quyền:** `RolesGuard` đọc metadata của `@Roles(...)` qua `Reflector`. Nếu không khai báo metadata, mọi người dùng đã xác thực đều được qua; nếu có, vai trò phải thuộc tập được yêu cầu.
 
-## Error Scenarios
+## Kịch bản lỗi
 
-- **Duplicate email on register** → `400 Bad Request` ("This email is existed!").
-- **Unknown email or wrong password on login** → `401 Unauthorized` ("Email or password is
-  incorrect!"). The same message is used for both cases to avoid user enumeration.
-- **Missing / malformed / expired token** on a guarded route → `401 Unauthorized`
-  (`ignoreExpiration: false`).
-- **Valid token, insufficient role** → `403 Forbidden` (e.g. an `AUDIENCE` token hitting an
-  `@Roles(ORGANIZER)` endpoint).
+- Email đăng ký đã tồn tại → `400 Bad Request` (`This email is existed!`).
+- Email không tồn tại hoặc sai mật khẩu → `401 Unauthorized` với cùng thông báo chung để hạn chế dò tài khoản.
+- Token thiếu, sai định dạng hoặc hết hạn trên route được bảo vệ → `401 Unauthorized`.
+- Token hợp lệ nhưng không đủ vai trò → `403 Forbidden`.
 
-## Constraints
+## Ràng buộc
 
-- Passwords are bcrypt-hashed at rest; plaintext is never logged or returned.
-- JWT is signed with `JWT_SECRET` from `@nestjs/config`; required on boot.
-- Tokens are stateless — there is no server-side session store and (in Week 1) no refresh
-  token / revocation list.
-- `JwtAuthGuard` must run before `RolesGuard` so `req.user` is populated.
-- Concert read APIs (`GET /concerts`, `GET /concerts/:slug`) are intentionally public — no
-  guards.
+- Không ghi log hoặc trả về mật khẩu thuần hay `passwordHash`.
+- JWT được ký bằng `JWT_SECRET` từ `@nestjs/config`.
+- Không có session phía máy chủ, refresh token hay danh sách thu hồi token.
+- `JwtAuthGuard` phải chạy trước `RolesGuard`.
+- `GET /concerts` và `GET /concerts/:slug` cố ý là API công khai.
+- Đăng ký công khai không được nhận vai trò do client cung cấp.
 
-## Acceptance Criteria
+## Tiêu chí chấp nhận
 
-- Registering, then logging in as each of the three roles returns a valid JWT whose decoded
-  payload contains the correct `role`.
-- An `AUDIENCE` token hitting an `@Roles(ORGANIZER)` endpoint returns **403**.
-- A request with no/invalid token to a guarded endpoint returns **401**.
-- Logging in with a wrong password returns **401** with the generic message.
-- Registering with an already-used email returns **400**.
+- Đăng ký thành công trả người dùng có vai trò `AUDIENCE`; sau đó đăng nhập trả JWT hợp lệ với payload đúng.
+- Tài khoản `ORGANIZER` và `SCANNER` được seed có thể đăng nhập và nhận JWT đúng vai trò.
+- Token `AUDIENCE` gọi endpoint yêu cầu `ORGANIZER` → `403`.
+- Không có token hoặc token không hợp lệ gọi endpoint được bảo vệ → `401`.
+- Sai mật khẩu → `401`; email đăng ký trùng → `400`.

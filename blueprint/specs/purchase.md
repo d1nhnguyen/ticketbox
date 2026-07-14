@@ -1,29 +1,38 @@
-# Đặc tả: Luồng mua vé & Kiểm soát đồng thời (Purchase Flow & Concurrency Spec)
+# Đặc tả luồng mua vé và kiểm soát đồng thời
 
 ## Mô tả
-Tính năng này cho phép khán giả chọn loại vé và số lượng để mua cho một concert cụ thể, khởi tạo đơn hàng ở trạng thái `PENDING` (giữ vé trong 10 phút) trước khi thực hiện thanh toán qua cổng thanh toán.
+
+Khán giả chọn một loại vé và số lượng, tạo đơn `PENDING` giữ kho trong 10 phút rồi xác nhận bằng cổng mock hoặc VNPay tùy cấu hình.
 
 ## Luồng chính
-1. Khán giả chọn concert, loại vé và số lượng vé mong muốn (ví dụ: SVIP, số lượng = 2).
-2. Hệ thống kiểm tra xem thời điểm mở bán của loại vé này đã bắt đầu hay chưa.
-3. Hệ thống kiểm tra giới hạn mua vé của tài khoản khán giả (`maxPerUser`).
-4. Hệ thống kiểm tra số lượng vé còn lại trong kho (`remainingQty`).
-5. Nếu mọi điều kiện hợp lệ, hệ thống thực hiện giảm số lượng vé còn lại một cách nguyên tử (atomic decrement) và tạo đơn hàng `PENDING` kèm thời hạn hết hạn là 10 phút.
-6. Kết quả đơn hàng được lưu vào Redis cache với `Idempotency-Key` của request.
-7. Đơn hàng được trả về cho client để thực hiện thanh toán qua cổng thanh toán.
+
+1. Client gửi `POST /orders` với `{ ticketTypeId, quantity }`, JWT `AUDIENCE` và header `Idempotency-Key`.
+2. Redis nhận khóa `idemp:<key>` bằng `SET NX EX 86400`; key đang xử lý trả `409`, key đã hoàn tất trả lại đúng kết quả cũ.
+3. Trong transaction, backend khóa dòng `TicketType` bằng `SELECT ... FOR UPDATE`, kiểm tra thời gian mở bán và tổng số vé `PAID` cộng `PENDING` chưa hết hạn của người dùng.
+4. `updateMany` chỉ giảm `remainingQty` khi còn đủ kho, sau đó tạo `Order(PENDING)`, `OrderItem` và `expiresAt = now + 10 phút`.
+5. Sau commit, kết quả được lưu Redis 24 giờ và cache concert được vô hiệu hóa.
+6. Job lặp `release-expired` trên queue `orders` chạy mỗi phút, chuyển đơn hết hạn sang `EXPIRED` và hoàn kho.
 
 ## Kịch bản lỗi
-1. **Vé đã bán hết (Sold out):** Hệ thống trả về lỗi `409 Conflict` kèm thông báo "Sold out".
-2. **Vượt quá giới hạn mua per-user (Limit Exceeded):** Hệ thống trả về lỗi `400 Bad Request` kèm thông báo chi tiết số vé đã mua/đã giữ.
-3. **Đơn hàng trùng lặp đang xử lý (Duplicate in process):** Gửi request với cùng `Idempotency-Key` khi request trước chưa xử lý xong → Trả về lỗi `409 Conflict` "Duplicate request still processing".
-4. **Lỗi thanh toán thất bại:** Nếu thanh toán thất bại hoặc quá hạn 10 phút, trạng thái đơn hàng chuyển sang `FAILED` hoặc `EXPIRED` và số lượng vé giữ được hoàn lại kho (`remainingQty` tăng lại).
 
-## Ràng buộc & Cơ chế Kỹ thuật
-- **Oversell Guard (Cơ chế #1):** Dùng conditional update `remainingQty: { gte: quantity }` bên trong transaction để loại bỏ hoàn toàn race condition khi bán vé cuối cùng.
-- **Per-user limit under load (Cơ chế #6):** Thực hiện khóa dòng `SELECT * FROM "TicketType" WHERE id = ? FOR UPDATE` để tuần tự hóa (serialize) các transaction mua của cùng loại vé, đảm bảo đếm chính xác số lượng vé một tài khoản đã đặt và ngăn chặn lách luật bằng request song song.
-- **Idempotency Key (Cơ chế #4a):** Dùng Redis làm bộ nhớ đệm phân tán để kiểm soát trùng lặp thông qua `Idempotency-Key`. Trả về cùng một kết quả giao dịch nếu client gửi trùng key.
+- Thiếu `Idempotency-Key` → `400 Bad Request`.
+- Loại vé không tồn tại → `404 Not Found`; chưa tới `saleStartsAt` → `400 Bad Request`.
+- Không đủ kho → `409 Conflict` (`Sold out`).
+- Vượt `maxPerUser` → `400 Bad Request` với số lượng đã mua/giữ.
+- Cùng key đang xử lý → `409 Conflict`; sau lỗi transaction, Redis key được xóa để client có thể retry thật.
+- Thanh toán thất bại hoặc đơn hết hạn → `FAILED`/`EXPIRED` và hoàn `remainingQty` đúng một lần.
+
+## Ràng buộc và cơ chế kỹ thuật
+
+- **Chống oversell:** conditional decrement trong transaction; kho không thể âm.
+- **Giới hạn mỗi người dùng khi có tải:** khóa dòng loại vé tuần tự hóa các giao dịch cùng loại trước khi đếm `PAID` và `PENDING` còn hạn.
+- **Idempotency:** Redis là đường nhanh; unique nullable `Order.idempotencyKey` trong PostgreSQL là lớp chặn bền vững.
+- **Rate limiting:** `POST /orders` dùng token bucket theo người dùng với capacity 150 và refill 10 token/giây.
+- Mỗi đơn hiện chứa một `OrderItem` vì DTO mua chỉ nhận một `ticketTypeId`.
 
 ## Tiêu chí chấp nhận
-1. Chạy song song nhiều request mua vé của cùng một tài khoản → Tổng số vé được mua/giữ thành công không bao giờ vượt quá `maxPerUser`.
-2. Chạy song song nhiều request mua vé của nhiều tài khoản khác nhau khi số lượng vé sắp hết → Số vé bán ra không vượt quá số lượng vé thực tế trong kho, không có vé âm.
-3. Gửi 2 request giống hệt nhau với cùng một `Idempotency-Key` cùng lúc hoặc liên tiếp → Chỉ tạo 1 đơn hàng duy nhất trong database và không trừ tiền/giữ vé 2 lần.
+
+- Request song song của một tài khoản không vượt `maxPerUser`.
+- Request song song của nhiều tài khoản không bán vượt kho và không tạo `remainingQty` âm.
+- Hai request cùng `Idempotency-Key` chỉ tạo một đơn và giữ kho một lần; request lặp sau đó nhận cùng kết quả.
+- Đơn hết hạn được worker chuyển `EXPIRED` và hoàn kho; chạy worker lại không hoàn lần hai.

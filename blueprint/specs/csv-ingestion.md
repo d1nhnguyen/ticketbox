@@ -1,59 +1,63 @@
-# CSV Ingestion Spec
+# Đặc tả nhập danh sách khách mời CSV
 
-## 1. Description
-A resilient component that parses VIP guest list CSV files for concerts. It ensures that duplicate rows are updated or ignored gracefully, parsing failures are isolated to the specific row without failing the entire batch, and duplicate file content triggers an immediate checksum-based skip — whether the file arrives via a scheduled drop-folder or an interactive upload.
+## 1. Mô tả
 
-## 2. Architecture Decision Record (ADR): Scheduled Inbox + Upload, One Shared Pipeline
-- **Context**: The assignment requires guest lists to be ingested *periodically* ("định kỳ nhập"), not only on manual admin action.
-- **Decision**: A `InboxPollerService` (`@Cron(EVERY_10_SECONDS)`, in the `guests` module) polls a mounted directory (`CSV_INBOX_DIR`, default `/data/inbox`, bind-mounted from `./data/inbox` in `docker-compose.yml`) and feeds new files into the **same** ingest core (`GuestsService.ingestBuffer`) used by the existing interactive upload endpoint (`POST /admin/concerts/:concertId/guests/upload`). Both paths converge on identical checksum dedup, `CsvImportBatch` bookkeeping, and the unmodified `GuestsProcessor` BullMQ worker.
-- **Why**:
-  - Satisfies "định kỳ nhập" without giving up the organizer's ability to upload and see status immediately from the Admin UI — the upload endpoint stays as the interactive/on-demand path.
-  - Reusing `ingestBuffer` means the file's origin (inbox vs. multipart upload) is irrelevant past the point the bytes are read — no duplicated checksum/queue logic to keep in sync.
-  - The poller only decides *where files end up on disk*; it never touches CSV parsing or row validation, so the well-tested `GuestsProcessor` worker needed zero changes.
-- **Concert association convention**: inbox files are named `<concert-slug>__anything.csv` (slug = the part before the first `__`, or the whole basename if there's no `__`). This is a filename convention, not a per-concert subfolder, matching "no distributed file watcher or object storage" scope constraint.
-- **Consequences**: two ingestion entry points, one pipeline. No cron job runs the parsing itself — the cron only discovers files and calls the same service method the controller calls.
+Thành phần nhập danh sách khách VIP theo concert, cô lập lỗi từng dòng và chống nhập trùng theo SHA-256. File có thể đến từ thư mục được quét định kỳ hoặc upload thủ công; cả hai đi qua cùng `GuestsService.ingestBuffer` và worker `GuestsProcessor`.
 
-## 3. Main Flow
+## 2. ADR: Một pipeline cho thư mục định kỳ và upload
 
-### 3a. Scheduled inbox (primary, periodic path)
-1. A CSV file is dropped (copied) into `data/inbox/` on the host, named `<concert-slug>__anything.csv`.
-2. Within 10s, `InboxPollerService.poll()` (re-entrancy-guarded, single in-flight tick) lists the directory, skipping dotfiles and any file modified in the last 3s (still being copied).
-3. Resolve the concert by slug first — unknown slug moves the file to `data/inbox/failed/`. For a known concert, hash the file and look up `CsvImportBatch` by the composite key `(concertId, checksum)`, then call `GuestsService.ingestBuffer(concertId, filename, buffer)` when it is new. The original inbox file is left in place while the worker runs.
-4. On the next tick(s), the poller re-hashes the file and looks up its batch by checksum: `PROCESSING` → leave it (worker still running / retrying); `SUCCESS` → sweep to `data/inbox/processed/`; `FAILED` → sweep to `data/inbox/failed/`. This makes outcome visible on disk without the poller needing to know about BullMQ job state directly.
-5. Re-copying identical file content for the same concert (even under a different filename) resolves to the same composite key, so it is swept straight to `processed/` without creating duplicate rows. The same bytes may legitimately be imported for another concert.
+- **Bối cảnh:** Yêu cầu có luồng nhập định kỳ, không chỉ thao tác thủ công từ giao diện quản trị.
+- **Quyết định:** `InboxPollerService` chạy `@Cron(EVERY_10_SECONDS)`, quét `CSV_INBOX_DIR` (mặc định `/data/inbox`, bind mount từ `./data/inbox`). File mới và endpoint `POST /admin/concerts/:concertId/guests/upload` cùng gọi `GuestsService.ingestBuffer`.
+- **Lý do:** Dùng chung checksum, `CsvImportBatch`, queue `guests` và logic parse; nguồn file không làm thay đổi pipeline xử lý.
+- **Quy ước concert:** Tên file inbox có dạng `<concert-slug>__anything.csv`; nếu không có `__`, toàn bộ basename là slug.
+- **Hệ quả:** Cron chỉ phát hiện và chuyển file; việc parse vẫn do BullMQ worker thực hiện. Đây là cơ chế polling một instance, không phải file watcher phân tán.
 
-### 3b. Interactive upload (secondary, on-demand path)
-1. **Upload**: Organizer uploads a CSV file via `POST /admin/concerts/:concertId/guests/upload` on the Admin UI.
-2. **Enqueue**: `GuestsService.uploadCsv` verifies the concert exists, then delegates to the same `ingestBuffer` core described above.
-3. **Deduplication (File Level)**: If the checksum already has a `CsvImportBatch`, the upload is rejected immediately (`409 Conflict`).
+## 3. Luồng chính
 
-### 3c. Shared worker (both paths)
-4. **Parsing**: `GuestsProcessor` (`@Processor('guests')`) picks up the `guests.import` job and streams the CSV file (`csv-parser`), unaware of whether it originated from the inbox or an upload.
-5. **Validation & Insertion**:
-   - Each row requires `fullName` and `zone`; `docId` is optional. Missing either fails just that row.
-   - In-file dedup (by `docId`, or by `fullName` when `docId` is absent) via in-memory Sets, then cross-batch DB dedup by querying existing `GuestListEntry` rows for the concert.
-   - Bulk insert via `guestListEntry.createMany({ skipDuplicates: true })`, tagged with `sourceBatchId`.
-6. **Completion**: `CsvImportBatch` updated to `SUCCESS` (with `rowsTotal`/`rowsOk`/`rowsFailed`) or, after the final BullMQ retry attempt, `FAILED`. The temp file under `uploads/` is removed either way.
+### 3.1. Thư mục định kỳ
 
-## 4. Error Scenarios
-- **Duplicate content for one concert**: Skipped via the pre-check + DB composite unique constraint on `(concertId, checksum)`; inbox variant sweeps the file straight to `processed/`, upload variant returns `409 Conflict`.
-- **Corrupt/Invalid row (e.g., missing name or zone)**: Increments `rowsFailed` for the batch, logs a warning, processor continues to the next row — valid rows in the same file still import.
-- **Malformed file / wrong schema**: The worker requires `fullName` and `zone` headers. Missing headers destroy the parser stream with an error; BullMQ retries up to 3 times (exponential backoff), then marks the batch `FAILED` and removes its temp file. The poller subsequently sweeps the inbox file to `failed/` without crashing the backend.
-- **Temp-file or enqueue failure**: `ingestBuffer` removes any temp file and changes the newly-created batch from `PROCESSING` to `FAILED` before returning the error, so the checksum never leaves a permanently stuck batch.
-- **Unknown concert slug in inbox filename**: The poller cannot resolve a concert, so it moves the file straight to `data/inbox/failed/` without ever creating a batch.
-- **Non-`.csv` file dropped in the inbox**: Moved straight to `failed/` on sight.
-- **Worker crash mid-processing**: If the server dies mid-processing, BullMQ retries the job on restart; checksum uniqueness means a re-attempt is safe (no double `CsvImportBatch`).
+1. Chép file vào `data/inbox/` trên host.
+2. Mỗi 10 giây poller liệt kê file, bỏ qua dotfile, thư mục con và file được sửa trong 3 giây gần nhất để tránh đọc lúc đang chép. Cờ nội bộ ngăn hai lượt poll chồng nhau.
+3. Poller suy ra slug, tìm concert, đọc buffer và tính SHA-256.
+4. Nếu chưa có batch `(concertId, checksum)`, poller gọi `ingestBuffer`; file gốc được giữ tại inbox trong khi worker chạy.
+5. Các lượt sau kiểm tra batch: `PROCESSING` thì giữ nguyên, `SUCCESS` chuyển sang `processed/`, `FAILED` chuyển sang `failed/`.
+6. Nội dung giống hệt cho cùng concert được chuyển thẳng sang `processed/`; cùng nội dung vẫn được nhập cho concert khác.
 
-## 5. Constraints
-- **Memory model**: The worker parses with `fs.createReadStream` and `csv-parser`; the current inbox/upload gateway buffers the file once to calculate SHA-256 and persist the BullMQ temp file. Guest-list files are expected to be small in this project scope; production deployment should add an explicit upload-size limit or streaming hash pipeline.
-- **Database Limits**: Use `Prisma.guestListEntry.createMany` with `skipDuplicates: true` or process rows sequentially if complex validation is needed.
-- **No distributed file watcher or object storage**: a single-instance polling cron with a boolean re-entrancy guard is sufficient for this scope; the inbox directory is a plain bind mount (`./data/inbox`), not S3/GCS or a `chokidar`-style filesystem watcher.
+### 3.2. Upload thủ công
 
-## 6. Acceptance Criteria
-- Copying a valid CSV named `<slug>__anything.csv` into `data/inbox/` — without calling the upload API — creates the guest list for that concert within one poll interval, and the file is swept to `processed/`.
-- A CSV with formatting errors in some rows still imports the valid rows; `rowsFailed` reflects the bad ones.
-- Dropping the exact same file content again for the same concert (any filename) is skipped as a duplicate and swept to `processed/`; identical content for another concert remains importable.
-- A malformed/non-CSV file does not crash the worker or backend process, and ends up in `failed/`.
-- An inbox file naming an unknown concert slug is moved to `failed/` without side effects.
-- Uploading a valid CSV via the Admin UI still imports successfully and displays the guest list (interactive path unaffected).
-- Re-uploading the exact same CSV via the Admin UI still returns a `409 Conflict` (Checksum duplicate).
+1. `ORGANIZER` upload multipart field `file` tới `POST /admin/concerts/:concertId/guests/upload`.
+2. Service kiểm tra concert rồi gọi `ingestBuffer`.
+3. Checksum đã tồn tại cho concert → `409 Conflict`; nếu mới, tạo `CsvImportBatch(PROCESSING)`, ghi file tạm `uploads/<batchId>.csv` và enqueue job `guests.import` với tối đa 3 lần thử.
+
+### 3.3. Worker dùng chung
+
+1. `GuestsProcessor` đọc stream bằng `csv-parser`, yêu cầu header `fullName` và `zone`; `docId` không bắt buộc.
+2. Dòng thiếu trường bắt buộc bị tính vào `rowsFailed`, các dòng khác vẫn tiếp tục.
+3. Trong file, trùng được xác định theo `docId`, hoặc theo `fullName` nếu không có `docId`. Sau đó worker đối chiếu tiếp với dữ liệu đã có của cùng concert.
+4. Dòng hợp lệ được chèn hàng loạt bằng `createMany({ skipDuplicates: true })` với `sourceBatchId`.
+5. Batch được cập nhật `SUCCESS` cùng `rowsTotal`, `rowsOk`, `rowsFailed`; lỗi cuối cùng sau retry đổi thành `FAILED`. File tạm bị xóa ở cả hai kết quả.
+
+## 4. Kịch bản lỗi
+
+- Nội dung trùng trong cùng concert → inbox chuyển sang `processed/`, upload trả `409`.
+- Dòng hỏng → chỉ dòng đó thất bại; batch vẫn có thể `SUCCESS` với `rowsFailed > 0`.
+- Thiếu header bắt buộc hoặc CSV lỗi → worker retry 3 lần rồi đánh dấu `FAILED`; poller chuyển file vào `failed/`.
+- Lỗi ghi file tạm/enqueue → xóa file tạm và đổi batch vừa tạo sang `FAILED`.
+- Slug không tồn tại hoặc file không phải `.csv` → chuyển thẳng sang `failed/`, không tạo batch.
+- Worker dừng giữa chừng → BullMQ retry khi tiến trình hoạt động lại; unique `(concertId, checksum)` ngăn tạo batch trùng.
+
+## 5. Ràng buộc
+
+- Gateway hiện buffer toàn bộ file để băm và ghi file tạm; worker mới parse bằng stream. Phạm vi dự án giả định danh sách nhỏ và hiện chưa đặt giới hạn upload CSV rõ ràng.
+- Unique DB của `GuestListEntry` là `(concertId, docId, sourceBatchId)`. Vì PostgreSQL coi các giá trị `NULL` là khác nhau, dedup khách không có `docId` được thực hiện ở tầng ứng dụng theo `fullName` trong cùng concert.
+- Poller một instance với cờ chống re-entry phù hợp phạm vi hiện tại; triển khai nhiều backend cần cơ chế leader/distributed lock.
+- Các thư mục `processed/` và `failed/` nằm dưới inbox và tên file được thêm timestamp khi di chuyển.
+
+## 6. Tiêu chí chấp nhận
+
+- Chép file `<slug>__anything.csv` hợp lệ vào `data/inbox/` sẽ tạo danh sách trong một chu kỳ poll và chuyển file sang `processed/`.
+- Dòng sai không làm mất các dòng đúng; số đếm batch phản ánh kết quả.
+- File trùng cùng concert không tạo khách/batch mới; cùng nội dung cho concert khác vẫn được phép.
+- File sai định dạng, không phải CSV hoặc có slug lạ không làm backend crash và được chuyển vào `failed/`.
+- Upload từ giao diện quản trị vẫn hoạt động; upload lại cùng nội dung trả `409 Conflict`.
+- Scanner có thể tải danh sách qua `GET /concerts/:id/guests`, xác minh qua `POST /guests/verify` và check-in VIP qua `POST /guests/check-in`.

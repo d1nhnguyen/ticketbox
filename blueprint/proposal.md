@@ -1,57 +1,52 @@
-# TicketBox — Project Proposal
+# TicketBox — Đề xuất dự án
 
-## 1. Vấn đề (The Problem)
+## 1. Vấn đề
 
-Hiện nay, nhiều ban tổ chức (BTC) sự kiện nhỏ và vừa đang phải vật lộn với các quy trình bán vé thủ công chắp vá. Các giải pháp như sử dụng Google Form để thu thập thông tin, Zalo OA để giao tiếp và yêu cầu khách hàng chuyển khoản ngân hàng thủ công bộc lộ nhiều điểm yếu chí mạng khi quy mô tăng lên:
-- **Hệ thống quá tải (Crashes):** Google Form hoặc các máy chủ tự dựng nhỏ lẻ thường sập khi có lượng lớn người truy cập cùng lúc vào thời điểm mở bán vé.
-- **Tiền mất vé không có (Oversell & Data Inconsistency):** Xử lý chuyển khoản ngân hàng thủ công chậm trễ, dẫn đến tình trạng bán vượt quá số lượng vé thực tế. Khách hàng đã chuyển tiền nhưng không nhận được vé, gây ra sự phẫn nộ và khủng hoảng truyền thông.
-- **Gian lận và Đầu cơ (Scalper bots):** Không có cơ chế chặn bot đầu cơ gom vé, dẫn đến việc khán giả thực sự không thể mua được vé với giá gốc.
-- **Check-in hỗn loạn:** Tại sự kiện, mạng di động hoặc wifi thường xuyên bị quá tải. Các giải pháp check-in online hoàn toàn bị tê liệt, gây ùn tắc tại cổng soát vé.
+Nhiều ban tổ chức sự kiện nhỏ và vừa vẫn ghép nối Google Form, Zalo OA và chuyển khoản thủ công. Khi lượng truy cập tăng, quy trình này bộc lộ các vấn đề:
 
-## 2. Mục tiêu (Goals)
+- **Quá tải:** biểu mẫu hoặc máy chủ nhỏ có thể sập đúng thời điểm mở bán.
+- **Bán vượt kho và sai lệch dữ liệu:** xác nhận chuyển khoản chậm khiến khách đã trả tiền nhưng không nhận được vé.
+- **Đầu cơ:** thiếu giới hạn mua và rate limiting tạo điều kiện cho bot gom vé.
+- **Soát vé hỗn loạn:** mạng tại địa điểm tổ chức dễ quá tải, làm giải pháp chỉ hoạt động trực tuyến bị tê liệt.
 
-Dự án TicketBox ra đời nhằm giải quyết triệt để các vấn đề trên bằng một hệ thống phân phối vé mạnh mẽ, đáng tin cậy. Các mục tiêu cụ thể bao gồm:
-- **High Availability & Scalability:** Chịu tải tối đa lên đến 80,000 requests/5 phút mà không sập hệ thống.
-- **Data Consistency (Zero Oversell):** Đảm bảo tính toàn vẹn dữ liệu, không bao giờ bán quá số lượng vé tồn kho ngay cả trong môi trường có tính đồng thời cao.
-- **No Double Charge:** Xử lý thanh toán an toàn, đảm bảo khách hàng không bao giờ bị trừ tiền hai lần cho một giao dịch, dù cho kết nối mạng chập chờn hay API của cổng thanh toán phản hồi chậm.
-- **Offline Check-in:** Giải pháp soát vé PWA có khả năng hoạt động hoàn toàn offline, đảm bảo tốc độ qua cổng và sau đó tự động đồng bộ khi có mạng, ngăn chặn các trường hợp dùng chung mã QR.
+## 2. Mục tiêu
 
-## 3. Người dùng và Nhu cầu (Users & Needs)
+- **Khả năng chịu tải:** hướng tới kịch bản 80.000 request trong 5 phút mà hệ thống không sập.
+- **Nhất quán dữ liệu:** không bán vượt `remainingQty` ngay cả khi nhiều request đồng thời.
+- **Không thu tiền hai lần:** thao tác lặp lại được bảo vệ bằng idempotency ở Redis, PostgreSQL và trạng thái đơn.
+- **Soát vé ngoại tuyến:** PWA tải trước snapshot, quét bằng IndexedDB và đồng bộ khi có mạng.
+- **Cô lập lỗi:** lỗi cổng thanh toán, SMTP hoặc worker không làm tê liệt chức năng duyệt concert.
 
-Hệ thống phục vụ 3 nhóm người dùng chính:
-1. **Khán giả (Audience):** 
-   - Mua vé nhanh chóng, công bằng, không bị nghẽn mạng hay lỗi thanh toán.
-   - Quản lý vé điện tử dễ dàng (e-ticket QR code) và nhận thông báo về sự kiện.
-2. **Ban tổ chức (Organizer / Admin):**
-   - Quản lý sự kiện, hạng vé, theo dõi doanh thu và trạng thái bán vé theo thời gian thực.
-   - Quản lý danh sách khách mời đặc biệt (VIP) thông qua việc import file CSV một cách an toàn.
-3. **Nhân viên soát vé (Scanner):**
-   - Soát vé nhanh chóng bằng camera thiết bị di động, ứng dụng vẫn phải hoạt động mượt mà ngay cả khi không có kết nối internet tại địa điểm tổ chức.
-   - Soát vé dựa trên danh sách khách mời (VIP list).
+## 3. Người dùng và nhu cầu
 
-## 4. Phạm vi / Ngoài phạm vi (Scope & Out of Scope)
+1. **Khán giả:** xem concert công khai, tạo và thanh toán đơn, nhận e-ticket QR, xem đơn và thông báo.
+2. **Ban tổ chức:** quản lý concert, loại vé, tiểu sử nghệ sĩ, danh sách khách mời CSV và thống kê doanh thu.
+3. **Nhân viên soát vé:** đăng nhập PWA, chọn concert, tải snapshot vé/khách VIP, quét offline và xử lý xung đột sau đồng bộ.
 
-**Trong phạm vi (In Scope):**
-- Xây dựng 7 cơ chế kỹ thuật cốt lõi: Rate Limiting, Idempotency, Circuit Breaker, Offline Sync, Concurrent Booking, CSV Ingestion, Caching.
-- Ứng dụng Backend API, Web cho Admin/Audience, và PWA cho Scanner.
-- Triển khai cục bộ trên môi trường `docker-compose`.
-- Mock API Gateway là luồng thanh toán mặc định, hoạt động đầy đủ và mô phỏng tỷ lệ lỗi/delay. VNPay sandbox là tích hợp tùy chọn khi có đủ thông tin merchant.
+## 4. Phạm vi
 
-**Ngoài phạm vi (Out of Scope):**
-- Mock Gateway là phạm vi thanh toán chính và mặc định; VNPay sandbox chỉ là tích hợp tùy chọn, không cần thiết để chạy hoặc chấm demo. MoMo và thanh toán production bằng tiền thật nằm ngoài phạm vi.
-- Không xây dựng Native Mobile App (iOS/Android), thay vào đó là PWA (Progressive Web App).
-- Không chọn ghế cụ thể (Not per-seat assignment), thay vào đó quản lý số lượng theo khu vực (Zone/Ticket Type).
-- Không triển khai trên hạ tầng cloud thực tế (No production infra).
+- Backend NestJS dạng modular monolith; Prisma/PostgreSQL; Redis cho token bucket, cache-aside, idempotency và BullMQ.
+- Web React/Vite cho khán giả và ban tổ chức; Scanner PWA React/Vite dùng Dexie/IndexedDB.
+- Bảy cơ chế trọng tâm: chống oversell, rate limiting, circuit breaker, idempotency, giới hạn mỗi người dùng, đồng bộ offline và cache-aside; bổ sung pipeline CSV cùng thông báo bất đồng bộ.
+- Cổng mock là luồng thanh toán mặc định; VNPay sandbox là tích hợp tùy chọn khi có cấu hình merchant.
+- Chạy cục bộ bằng Docker Compose với PostgreSQL, Redis, Mailpit, mock gateway, backend, web và scanner.
 
-## 5. Rủi ro và Ràng buộc (Risks & Constraints)
+## 5. Ngoài phạm vi
 
-Dự án phải vượt qua 7 bài toán kỹ thuật (được coi là các cơ chế cốt lõi để bảo vệ hệ thống):
-1. **Oversell Prevention:** Xử lý Race Condition khi nhiều người cùng tranh mua vé cuối cùng.
-2. **Traffic Spikes:** Chống DDoS, Rate Limiting bảo vệ tài nguyên.
-3. **Third-party Gateway Failures:** Khả năng chịu đựng khi cổng thanh toán sập (Circuit Breaker).
-4. **Idempotency & Double-charge:** Giao dịch an toàn khi có retry (thanh toán) và chống check-in lặp (Offline Double-scan).
-5. **Data Ingestion:** Upload và xử lý an toàn danh sách CSV lớn (Validation, Idempotency, No-crash).
-6. **Per-user Limits:** Tránh bot đầu cơ gom số lượng lớn vé trong một thời điểm.
-7. **Read-heavy Overload:** Tối ưu hóa Database bằng cơ chế Caching (Redis cache-aside) để giảm tải khi người dùng liên tục F5.
+- MoMo và thanh toán tiền thật trong production.
+- Ứng dụng native iOS/Android; dự án dùng PWA.
+- Chọn ghế cụ thể; kho được quản lý theo `TicketType`/khu vực.
+- Hạ tầng production nhiều vùng, object storage hoặc file watcher phân tán.
+- Microservices, Kafka/RabbitMQ và hệ thống hoàn tiền tài chính hoàn chỉnh.
 
-Quyết định dùng Mock Gateway không biến các cơ chế bảo vệ thành stub: rate limiting, circuit breaker, idempotency, retry safety và cache-aside đều chạy bằng implementation thật đối với HTTP gateway mô phỏng. Điều khoản “no stubs” của bài tập được áp dụng đầy đủ cho các cơ chế bảo vệ ở §6/§7; chỉ nhà cung cấp thanh toán bên thứ ba được thay bằng mock theo phạm vi đã công bố.
+## 6. Rủi ro và ràng buộc
+
+1. **Tranh chấp vé cuối:** khóa dòng `TicketType` và conditional decrement trong transaction.
+2. **Traffic spike/bot:** token bucket Redis theo IP hoặc người dùng; giới hạn endpoint nhạy cảm chặt hơn.
+3. **Cổng thanh toán lỗi:** Circuit Breaker trả nhanh `503`, đơn giữ `PENDING` để retry.
+4. **Request lặp:** khóa idempotency Redis TTL 24 giờ, unique key DB và conditional state transition.
+5. **Mạng cổng sự kiện yếu:** snapshot IndexedDB và hàng đợi đồng bộ; hai thiết bị cùng offline vẫn chỉ phát hiện trùng khi sync.
+6. **CSV xấu/trùng:** checksum theo concert, retry BullMQ và cô lập lỗi từng dòng.
+7. **Đọc nhiều:** cache-aside Redis cho danh sách/chi tiết concert; phần lớn luồng ghi chủ động invalidation, riêng cập nhật trực tiếp loại vé hiện còn phụ thuộc TTL chi tiết 60 giây.
+
+Cổng mock chỉ thay nhà cung cấp thanh toán bên thứ ba; các cơ chế bảo vệ vẫn là triển khai thật và có thể kiểm thử qua HTTP.

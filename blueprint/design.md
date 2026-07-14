@@ -1,145 +1,134 @@
-# TicketBox System Architecture Design
+# Thiết kế kiến trúc hệ thống TicketBox
 
-> Stack: NestJS + Prisma + PostgreSQL + Redis · React (Vite) for web/scanner.
+> Công nghệ: NestJS, Prisma, PostgreSQL, Redis/BullMQ; React + Vite cho web và Scanner PWA.
 
-## 1. C4 Model - Level 1: System Context Diagram
-Sơ đồ này thể hiện hệ thống TicketBox tương tác với các nhóm người dùng và các hệ thống bên ngoài.
+## 1. Mô hình C4 — Cấp 1: Bối cảnh hệ thống
 
 ```mermaid
 %%{init: {"c4": {"c4ShapeMargin": 90, "c4ShapePadding": 20, "diagramMarginX": 30, "diagramMarginY": 20}}}%%
 C4Context
-title System Context Diagram - TicketBox
+title Sơ đồ bối cảnh hệ thống TicketBox
 
-Person(audience, "Khán giả", "Tìm kiếm sự kiện, mua vé,<br/>nhận mã QR vé điện tử")
-Person(organizer, "Ban tổ chức", "Tạo sự kiện, cấu hình hạng vé,<br/>xem thống kê doanh thu")
-Person(scanner, "Nhân viên soát vé", "Quét QR code tại cổng sự kiện<br/>(hỗ trợ offline)")
+Person(audience, "Khán giả", "Tìm concert, mua vé, nhận e-ticket QR")
+Person(organizer, "Ban tổ chức", "Quản lý concert, loại vé, khách mời và doanh thu")
+Person(scanner, "Nhân viên soát vé", "Quét vé và khách VIP, kể cả khi mất mạng")
 
+System(ticketbox, "TicketBox", "Quản lý concert, bán vé, thông báo và soát vé")
+System_Ext(payment, "Nhà cung cấp thanh toán", "Mock gateway mặc định; VNPay sandbox tùy chọn")
+System_Ext(ai, "Nhà cung cấp AI", "Anthropic, Gemini hoặc OpenAI")
+System_Ext(smtp, "Máy chủ SMTP", "Mailpit trong môi trường phát triển")
+System_Ext(csv_folder, "Thư mục CSV dùng chung", "Nhận file khách mời theo lịch quét")
 
-System_Ext(payment, "Cổng thanh toán (VNPAY/MoMo)", "Hệ thống xử lý<br/>giao dịch tài chính")
-System(ticketbox, "TicketBox System", "Hệ thống cốt lõi quản lý sự kiện,<br/>bán vé và soát vé")
-System_Ext(ai_model, "AI Model", "Xử lý file PDF để tự động<br/>tạo tiểu sử nghệ sĩ")
-System_Ext(brand_csv, "Hệ thống Nhãn hàng", "Cung cấp danh sách khách mời<br/>dạng CSV")
-
-Rel(audience, ticketbox, "Xem sự kiện, đặt mua vé")
-Rel(organizer, ticketbox, "Quản lý hệ thống, xem báo cáo")
-Rel(scanner, ticketbox, "Soát vé khán giả tại cổng")
-
-Rel(ticketbox, payment, "Gửi yêu cầu và nhận<br/>kết quả thanh toán")
-Rel(ticketbox, ai_model, "Gửi nội dung PDF,<br/>nhận đoạn văn tiểu sử")
-Rel(ticketbox, brand_csv, "Định kỳ tải file<br/>danh sách khách mời")
+Rel(audience, ticketbox, "Xem concert, đặt và thanh toán vé", "HTTPS")
+Rel(organizer, ticketbox, "Quản trị và xem báo cáo", "HTTPS")
+Rel(scanner, ticketbox, "Tải snapshot và đồng bộ check-in", "HTTPS")
+Rel(ticketbox, payment, "Gửi yêu cầu/nhận kết quả thanh toán", "HTTPS")
+Rel(ticketbox, ai, "Gửi văn bản PDF/nhận tiểu sử", "HTTPS")
+Rel(ticketbox, smtp, "Gửi email", "SMTP")
+Rel(ticketbox, csv_folder, "Quét và nhập file định kỳ", "File system")
 
 UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
 ```
 
-### Kiến trúc tổng thể (Overall Architecture)
+### Kiến trúc tổng thể
 
-TicketBox được xây dựng theo kiến trúc **Modular Monolith** dựa trên NestJS.
-- **Client Tier**: Bao gồm Web App (khán giả, admin) và PWA Scanner (nhân viên soát vé offline).
-- **API Tier**: Cung cấp các RESTful API. Hệ thống được chia thành các module độc lập theo domain (Auth, Concerts, Orders, Payment, Notifications, Guests).
-- **Data & Background Tier**: PostgreSQL đóng vai trò lưu trữ chính (Single Source of Truth). Redis được sử dụng cho Caching, Rate Limiting, Idempotency và làm Message Broker cho BullMQ. Các Background Worker xử lý gửi thông báo, import CSV, quét đơn hàng hết hạn.
-- **Giao tiếp**: 
-  - Các module trong hệ thống gọi nhau qua service layer trực tiếp hoặc thông qua Event Emitter nội bộ (ví dụ: `order.paid` kích hoạt Notification).
-  - Giao tiếp với Client qua HTTP REST.
-  - Giao tiếp với Background Worker qua Redis Queue (BullMQ).
+TicketBox là **modular monolith** NestJS:
 
-### 1.1. C4 Model - Level 2: Container Diagram
+- **Tầng máy khách:** Web React cho khán giả/ban tổ chức và Scanner PWA cho nhân viên cổng.
+- **Tầng API/nghiệp vụ:** Các module Auth, Concerts, Ticket Types, Orders, Payment, Notifications, Guests, AI Bio và Check-in giao tiếp qua lời gọi service hoặc `EventEmitter2`.
+- **Tầng dữ liệu/nền:** PostgreSQL là nguồn dữ liệu chuẩn; Redis phục vụ token bucket, cache, idempotency và BullMQ.
+- **Worker:** `OrdersProcessor`, `NotificationsProcessor` và `GuestsProcessor` chạy trong cùng tiến trình/container NestJS backend hiện tại. Chúng tách biệt logic qua queue nhưng chưa phải deployment riêng.
+- **Giao tiếp:** Client dùng JSON/HTTP; worker dùng Redis queue; Prisma kết nối PostgreSQL; tích hợp ngoài dùng HTTP/SMTP.
+
+## 1.1. Mô hình C4 — Cấp 2: Container
 
 ```mermaid
 %%{init: {"c4": {"c4ShapeMargin": 90, "c4ShapePadding": 20, "diagramMarginX": 30, "diagramMarginY": 20}}}%%
 C4Container
-title Container Diagram - TicketBox
+title Sơ đồ container TicketBox
 
-Person(audience, "Khán giả", "Mua vé")
-Person(organizer, "Ban tổ chức", "Quản lý")
-Person(scanner, "Soát vé", "Quét QR")
+Person(audience, "Khán giả", "Mua và quản lý vé")
+Person(organizer, "Ban tổ chức", "Quản trị")
+Person(scanner, "Nhân viên soát vé", "Quét QR/khách VIP")
 
-System_Boundary(ticketbox, "TicketBox System") {
-    Container(web_app, "Web Application", "React, Vite, Tailwind", "Giao diện chính cho<br/>Khán giả và Ban tổ chức")
-
-    Container(api, "Backend API", "NestJS, Node.js", "Xử lý logic nghiệp vụ,<br/>giao tiếp với DB và Queue")
-    Container(pwa_scanner, "Scanner PWA", "React, IndexedDB, Service Worker", "Ứng dụng quét vé<br/>Offline-first tại cổng")
-    Container(mock_gateway, "Mock Payment Gateway", "Express.js", "Giả lập phản hồi<br/>từ VNPAY/MoMo")
-    Container(worker, "Background Worker", "BullMQ, Node.js", "Xử lý tác vụ nền: Gửi thông báo,<br/>hết hạn giữ chỗ")
-
-    ContainerDb(db, "Primary Database", "PostgreSQL", "Lưu trữ User, Concert,<br/>Order, Ticket")
-    ContainerDb(redis, "Cache & Message Broker", "Redis", "Rate limit, khóa Idempotency,<br/>hàng đợi BullMQ")
+System_Boundary(ticketbox, "TicketBox") {
+  Container(web, "Ứng dụng Web", "React, Vite", "Giao diện khán giả và quản trị")
+  Container(scanner_pwa, "Scanner PWA", "React, Vite, Dexie, IndexedDB", "Soát vé offline-first")
+  Container(api, "Backend API và Worker", "NestJS, BullMQ, Prisma", "REST API, nghiệp vụ, cron và consumer queue")
+  Container(mock, "Mock Payment Gateway", "Node.js", "Mô phỏng thành công, lỗi và độ trễ thanh toán")
+  ContainerDb(pg, "Cơ sở dữ liệu chính", "PostgreSQL 16", "User, Concert, Order, Ticket, Guest, Notification")
+  ContainerDb(redis, "Cache và broker", "Redis 7", "Rate limit, cache, idempotency và BullMQ")
+  Container(mailpit, "Mailpit", "SMTP/Web UI", "Hộp thư email phát triển")
+  Container(csv, "CSV Inbox", "Bind mount ./data:/data", "inbox, processed và failed")
 }
 
-Rel(audience, web_app, "Truy cập ứng dụng", "HTTPS")
-Rel(organizer, web_app, "Truy cập ứng dụng", "HTTPS")
-Rel(scanner, pwa_scanner, "Sử dụng ứng dụng", "HTTPS")
-
-Rel(web_app, api, "Gọi API", "JSON/HTTPS")
-Rel(pwa_scanner, api, "Đồng bộ dữ liệu check-in", "JSON/HTTPS")
-
-Rel(api, mock_gateway, "Yêu cầu thanh toán", "HTTPS")
-Rel(api, db, "Đọc/Ghi dữ liệu", "Prisma/TCP")
-Rel(api, redis, "Đọc/Ghi Cache & Đẩy Job", "TCP")
-Rel(worker, redis, "Lấy Job từ hàng đợi", "TCP")
-Rel(worker, db, "Cập nhật trạng thái", "Prisma/TCP")
+Rel(audience, web, "Sử dụng", "HTTPS")
+Rel(organizer, web, "Sử dụng", "HTTPS")
+Rel(scanner, scanner_pwa, "Sử dụng", "HTTPS")
+Rel(web, api, "Gọi REST API", "JSON/HTTPS")
+Rel(scanner_pwa, api, "Tải snapshot/đồng bộ", "JSON/HTTPS")
+Rel(api, pg, "Đọc/ghi", "Prisma/TCP")
+Rel(api, redis, "Cache, khóa và queue", "TCP")
+Rel(api, mock, "Thanh toán mock", "HTTP")
+Rel(api, mailpit, "Gửi email", "SMTP")
+Rel(api, csv, "Quét/di chuyển file", "File system")
 
 UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
 ```
 
-### 1.2. Request Flow Diagram (Runtime View)
+## 1.2. Luồng runtime chính
 
 ```mermaid
-%%{init: {'flowchart': {'nodeSpacing': 60, 'rankSpacing': 90, 'curve': 'basis'}}}%%
-graph TD
-    subgraph ClientTier["Client Tier"]
-        W[Web App - React]
-        P[PWA Scanner - React]
-        IDB[(IndexedDB Local)]
-    end
+flowchart TD
+  subgraph Client[Máy khách]
+    WEB[Web React]
+    PWA[Scanner PWA]
+    IDB[(IndexedDB)]
+  end
+  subgraph Backend[Backend NestJS]
+    API[REST API]
+    CB[Circuit Breaker]
+    WK[Worker BullMQ và Cron]
+  end
+  subgraph Data[Dữ liệu và queue]
+    PG[(PostgreSQL)]
+    RD[(Redis)]
+    CSV[(CSV Inbox)]
+  end
 
-    subgraph APITier["API Tier"]
-        API[NestJS API Core]
-        CB((Circuit Breaker))
-    end
-
-    subgraph DataQueueTier["Data and Queue Tier"]
-        PG[(PostgreSQL)]
-        RD[(Redis)]
-        WQ[BullMQ Worker]
-    end
-
-    W -->|"1. Đặt mua vé"| API
-    P -->|"2. Quét QR Offline"| IDB
-    P -->|"3. Gửi Batch Sync"| API
-
-    API -->|"4. Kiểm tra, khóa vé"| PG
-    API -->|"Rate Limit / Cache"| RD
-    API -->|"5. Đẩy job"| WQ
-
-    WQ -->|"6. Lấy job"| RD
-    WQ -->|"7. Cập nhật KQ"| PG
-
-    API --> CB
-    CB -->|"Giao dịch"| MockGateway[Mock Payment Gateway]
+  WEB -->|Tạo đơn/thanh toán| API
+  PWA -->|Tải snapshot| API
+  PWA -->|Quét offline| IDB
+  IDB -->|Batch sync khi online| API
+  API -->|Transaction/conditional update| PG
+  API -->|Rate limit/cache/idempotency| RD
+  API -->|Enqueue| RD
+  RD -->|Consume job| WK
+  WK -->|Cập nhật| PG
+  CSV -->|Poll mỗi 10 giây| WK
+  API --> CB --> MOCK[Mock gateway]
 ```
 
-## 2. Database Design
+## 2. Thiết kế cơ sở dữ liệu
 
-PostgreSQL is the single source of truth. Prisma manages the schema and migrations
-(`src/backend/prisma/schema.prisma`). All primary keys are UUIDs so IDs can be
-generated client-side and never collide across services.
+PostgreSQL là nguồn dữ liệu chuẩn. Prisma quản lý schema và migrations tại `src/backend/prisma/`. Khóa chính dùng UUID; một số ID như `CheckinLog.id` được tạo phía client để hỗ trợ đồng bộ idempotent.
 
-### Entity-Relationship Diagram
+### Sơ đồ quan hệ thực thể
 
 ```mermaid
 erDiagram
-  User ||--o{ Order : places
-  User ||--o{ Notification : receives
-  User ||--o{ Ticket : "scans (checkedInBy)"
-  Concert ||--o{ TicketType : has
-  Concert ||--o{ Order : "sold via"
-  Concert ||--o{ GuestListEntry : "guest list"
-  Concert ||--o{ CsvImportBatch : "imports"
-  TicketType ||--o{ OrderItem : "line item"
-  TicketType ||--o{ Ticket : issues
-  Order ||--o{ OrderItem : contains
-  Order ||--o{ Ticket : issues
-  Ticket ||--o{ CheckinLog : "scan attempts"
+  User ||--o{ Order : "đặt"
+  User ||--o{ Notification : "nhận"
+  User ||--o{ Ticket : "soát"
+  Concert ||--o{ TicketType : "có"
+  Concert ||--o{ Order : "bán qua"
+  Concert ||--o{ GuestListEntry : "danh sách khách"
+  Concert ||--o{ CsvImportBatch : "nhập"
+  TicketType ||--o{ OrderItem : "được đặt"
+  TicketType ||--o{ Ticket : "phát hành"
+  Order ||--o{ OrderItem : "chứa"
+  Order ||--o{ Ticket : "phát hành"
+  Ticket ||--o{ CheckinLog : "lịch sử quét"
 
   User {
     string id PK
@@ -155,8 +144,11 @@ erDiagram
     string venue
     datetime startsAt
     ConcertStatus status
-    string artistBio
-    string seatMapSvg
+    string artistBio nullable
+    string_array artists
+    string bioSourceUrl nullable
+    string seatMapSvg nullable
+    datetime createdAt
   }
   TicketType {
     string id PK
@@ -174,8 +166,9 @@ erDiagram
     string concertId FK
     OrderStatus status
     int totalAmount
-    string idempotencyKey UK
-    datetime expiresAt
+    string idempotencyKey UK_nullable
+    datetime expiresAt nullable
+    datetime createdAt
   }
   OrderItem {
     string id PK
@@ -190,8 +183,8 @@ erDiagram
     string ticketTypeId FK
     string qrCode UK
     TicketStatus status
-    datetime checkedInAt
-    string checkedInBy FK
+    datetime checkedInAt nullable
+    string checkedInBy FK_nullable
   }
   CheckinLog {
     string id PK
@@ -200,142 +193,146 @@ erDiagram
     datetime scannedAt
     SyncStatus syncStatus
   }
+  GuestListEntry {
+    string id PK
+    string concertId FK
+    string fullName
+    string docId nullable
+    string zone
+    string sourceBatchId
+    GuestStatus status
+  }
+  CsvImportBatch {
+    string id PK
+    string concertId FK
+    string filename
+    string checksum
+    ImportStatus status
+    int rowsTotal
+    int rowsOk
+    int rowsFailed
+    datetime createdAt
+  }
+  Notification {
+    string id PK
+    string userId FK
+    string channel
+    string type
+    json payload
+    NotificationStatus status
+    datetime sentAt nullable
+  }
 ```
 
-### Design decisions
+### Quyết định thiết kế dữ liệu
 
-- **Stock as a counter, not per-seat rows.** `TicketType.remainingQty` is decremented
-  atomically on reservation. This keeps the high-contention purchase path to a single
-  row update instead of inserting thousands of seat rows up front. The concurrency-safe
-  decrement (`UPDATE ... WHERE remainingQty >= qty`) is the Week 2 graded mechanism — see
-  [specs/purchase.md](specs/purchase.md).
-- **`Order.expiresAt` lives on the order**, because the reservation (the `remainingQty`
-  hold) is owned by the order, not the ticket type. A BullMQ sweeper (Person B) releases
-  expired holds. See the reservation model in [specs/purchase.md](specs/purchase.md).
-- **`Ticket.qrCode` is globally unique** so the scanner can resolve a ticket from the QR
-  payload alone, offline-first.
-- **`CheckinLog` is append-only** (every scan attempt is logged, including rejected
-  duplicates) for the audit trail and the "2 devices offline" demo. The double check-in
-  guard is enforced by a _partial_ unique index, not a plain unique — final choice is
-  documented in [specs/checkin.md](specs/checkin.md) (Person C).
-- **`GuestListEntry` dedup** uses `@@unique([concertId, docId, sourceBatchId])`. Because
-  PostgreSQL treats NULLs as distinct, NULL-safe dedup for guests without a `docId` is
-  handled in application code (Person B's CSV ingestion).
-- **Indexes** back every foreign key used in hot reads (`TicketType.concertId`,
-  `Order(userId, concertId)`, `OrderItem.orderId/ticketTypeId`, `CheckinLog.ticketId`).
-- **Cascade deletes** flow Concert → TicketType / GuestListEntry / CsvImportBatch and
-  Order/OrderItem so wiping a draft concert never strands child rows. `Ticket.checkedInBy`
-  is `ON DELETE SET NULL` to preserve issued tickets if a scanner account is removed.
+- **Kho theo bộ đếm:** `TicketType.remainingQty` được giảm có điều kiện trong transaction; không tạo trước một dòng cho từng ghế.
+- **Giữ chỗ thuộc đơn:** `Order.expiresAt` biểu diễn hạn giữ kho. Worker `orders` chạy mỗi phút để chuyển đơn hết hạn và hoàn kho.
+- **QR toàn cục:** `Ticket.qrCode` unique để scanner tra vé từ payload.
+- **Audit check-in:** `CheckinLog` append-only, `clientLogId` làm khóa chính. Guard chống quét trùng thực tế là conditional update `VALID → USED`.
+- **CSV theo concert:** `CsvImportBatch` unique `(concertId, checksum)`, vì cùng nội dung có thể hợp lệ cho concert khác.
+- **Khách thiếu giấy tờ:** unique `(concertId, docId, sourceBatchId)` không xử lý `NULL` theo mong muốn, nên service dedup `fullName` ở tầng ứng dụng.
+- **Index:** Có index cho các khóa ngoại trên đường đọc nóng như `TicketType.concertId`, `Order(userId, concertId)`, `OrderItem.orderId/ticketTypeId`, `CheckinLog.ticketId`.
+- **Xóa cascade:** Concert cascade sang loại vé, khách và batch; Order cascade sang item. `Ticket.checkedInBy` trong schema hiện chưa khai báo `onDelete: SetNull`, nên việc xóa user scanner có vé tham chiếu có thể bị DB chặn và cần xử lý rõ nếu bổ sung chức năng xóa user.
 
-### Enums
+### Enum
 
-`Role(AUDIENCE, ORGANIZER, SCANNER)`, `ConcertStatus(DRAFT, ON_SALE, CANCELLED)`,
-`OrderStatus(PENDING, PAID, FAILED, EXPIRED)`, `TicketStatus(VALID, USED, CANCELLED)`,
-`SyncStatus(PENDING, SYNCED, ACCEPTED, FAILED)`, `ImportStatus(PROCESSING, SUCCESS, FAILED)`,
-`NotificationStatus(PENDING, SENT, FAILED)`, `GuestStatus(INVITED, CHECKED_IN)`.
+`Role(AUDIENCE, ORGANIZER, SCANNER)`; `ConcertStatus(DRAFT, ON_SALE, CANCELLED)`; `OrderStatus(PENDING, PAID, FAILED, EXPIRED)`; `TicketStatus(VALID, USED, CANCELLED)`; `SyncStatus(PENDING, SYNCED, ACCEPTED, FAILED)`; `ImportStatus(PROCESSING, SUCCESS, FAILED)`; `NotificationStatus(PENDING, SENT, FAILED)`; `GuestStatus(INVITED, CHECKED_IN)`.
 
----
+## 3. Xác thực và RBAC
 
-## 3. Authentication & RBAC (Person A)
-
-JWT bearer tokens, stateless. Passwords are bcrypt-hashed at rest. Three roles map to the
-three apps: `AUDIENCE` → web browsing/purchase, `ORGANIZER` → admin, `SCANNER` → scanner app.
-
-### Flow
+JWT không trạng thái, mật khẩu bcrypt. Đăng ký công khai luôn tạo `AUDIENCE`; tài khoản `ORGANIZER` và `SCANNER` được cấp qua seed/quản trị.
 
 ```mermaid
 sequenceDiagram
-  participant C as Client
-  participant Auth as AuthController/Service
+  participant C as Máy khách
+  participant A as AuthController/Service
   participant DB as PostgreSQL
-  C->>Auth: POST /auth/login { email, password }
-  Auth->>DB: findUnique(email)
-  DB-->>Auth: user { passwordHash, role }
-  Auth->>Auth: bcrypt.compare(password, hash)
-  Auth-->>C: { access_token } (JWT signed with { sub, email, role })
-  Note over C,Auth: subsequent requests
-  C->>Auth: GET /protected (Authorization: Bearer <jwt>)
-  Auth->>Auth: JwtStrategy.validate → req.user { userId, email, role }
-  Auth->>Auth: RolesGuard checks @Roles() vs user.role
-  Auth-->>C: 200 if role allowed, else 403
+  C->>A: POST /auth/login { email, password }
+  A->>DB: findUnique(email)
+  DB-->>A: user { passwordHash, role }
+  A->>A: bcrypt.compare và ký JWT
+  A-->>C: { access_token }
+  C->>A: Request + Authorization: Bearer JWT
+  A->>A: JwtAuthGuard → JwtStrategy → RolesGuard
+  A-->>C: 2xx hoặc 401/403
 ```
 
-### Components
+Chi tiết xem [specs/auth.md](specs/auth.md).
 
-- **AuthService** — `register()` bcrypt-hashes the password and stores the user;
-  `login()` verifies the password and signs a JWT with payload `{ sub, email, role }`.
-- **JwtStrategy** — extracts the bearer token, verifies signature/expiry against
-  `JWT_SECRET`, attaches `{ userId, email, role }` to the request.
-- **`@Roles(...)` decorator + RolesGuard** — declarative endpoint protection. `RolesGuard`
-  reads the `roles` metadata via `Reflector`; absence of metadata means the route is open
-  to any authenticated user. `JwtAuthGuard` (Passport `'jwt'`) runs first to populate
-  `req.user`.
+## 4. Cô lập lỗi
 
-Full behaviour, error cases, and acceptance criteria: [specs/auth.md](specs/auth.md).
-
----
-
-## 4. Failure Isolation (Xử lý sự cố)
-
-Hệ thống được thiết kế để cô lập lỗi, đảm bảo khi một phần tử gặp sự cố, các phần tử khác vẫn duy trì hoạt động tối đa có thể:
-
-| Thành phần sự cố | Tác động đến hệ thống | Cơ chế dự phòng / Phục hồi |
+| Thành phần lỗi | Tác động | Cơ chế xử lý |
 |---|---|---|
-| **Cổng thanh toán (VNPAY)** chậm/chết | - Không thể thanh toán vé ngay lập tức. | - **Circuit Breaker** mở, chặn các gọi API dư thừa (trả về 503). Đơn hàng giữ trạng thái PENDING. Người dùng vẫn xem được danh sách Concert bình thường. |
-| **Redis** sập | - Tính năng Rate Limit, Caching, BullMQ ngừng hoạt động. | - API trả về dữ liệu trực tiếp từ PostgreSQL (nếu logic Cache có dự phòng fallback) hoặc báo lỗi ở các tính năng phụ thuộc. Cần có alert để khởi động lại Redis. |
-| **PostgreSQL** sập | - Toàn bộ chức năng Đọc/Ghi dữ liệu lõi ngừng hoạt động. | - Trả về lỗi 500/503. Scanner App vẫn có thể quét vé **Offline** nếu đã tải trước dữ liệu, sẽ chờ DB sống lại để đồng bộ (Sync). |
-| **Background Worker** chết | - Thông báo (Email, In-App), Import CSV bị trễ. | - Các Job vẫn nằm an toàn trong hàng đợi Redis (BullMQ). Khi Worker khởi động lại, nó sẽ tiếp tục xử lý các Job chưa hoàn thành. |
-| **Mất kết nối Internet tại cổng** | - Scanner không gọi được API lên Backend. | - Ứng dụng PWA chuyển sang chế độ **Offline-first**. Lưu lịch sử quét vào IndexedDB và chặn Double-scan cục bộ. |
+| Mock/VNPay chậm hoặc lỗi | Không xác nhận thanh toán | Circuit Breaker trả nhanh `503`; đơn mock giữ `PENDING` khi circuit open; duyệt concert không phụ thuộc gateway |
+| Redis lỗi | Rate limit, cache, idempotency và BullMQ bị ảnh hưởng | Các tính năng phụ thuộc Redis có thể lỗi; code hiện không có fallback đầy đủ sang PostgreSQL, cần giám sát/khởi động lại Redis |
+| PostgreSQL lỗi | Nghiệp vụ lõi không đọc/ghi được | API trả lỗi; scanner đã tải snapshot vẫn quét cục bộ và chờ đồng bộ |
+| Backend/worker dừng | API và consumer cùng dừng | Job còn bền vững trong Redis; tiếp tục khi backend khởi động lại |
+| SMTP lỗi | Email trễ | Job email retry tối đa 3 lần với exponential backoff; in-app là job riêng |
+| Nhà cung cấp AI lỗi | Không có nội dung AI đầy đủ | Lưu đoạn dự phòng từ PDF thay vì crash |
+| Mất Internet tại cổng | Không gọi được backend | PWA dùng IndexedDB và đồng bộ lại; xung đột hai thiết bị phát hiện khi sync |
 
----
+## 5. Bản ghi quyết định kiến trúc (ADR)
 
-## 5. Architecture Decision Records (ADRs)
+### ADR 1: Modular monolith thay vì microservices
 
-### ADR 1: Cấu trúc Modular Monolith thay vì Microservices
-- **Context**: Dự án có thời gian phát triển ngắn, team 3 người.
-- **Decision**: Chọn Modular Monolith với NestJS.
-- **Consequences**: Giảm chi phí deploy, dễ trace bug và giao dịch (transactions), code tập trung. Đánh đổi: Khó scale từng phần riêng biệt.
+- **Bối cảnh:** Nhóm nhỏ, thời gian phát triển ngắn và cần transaction nhất quán.
+- **Quyết định:** Một ứng dụng NestJS chia module theo domain.
+- **Hệ quả:** Dễ chạy, debug và giao dịch DB; không scale/deploy từng worker độc lập nếu chưa tách tiến trình.
 
-### ADR 2: Pessimistic Locking (`FOR UPDATE`) thay vì Optimistic Locking
-- **Context**: Bán vé sự kiện thường có lượng truy cập đột biến (Traffic spike) dồn vào cùng một hạng vé, dễ gây race condition và oversell.
-- **Decision**: Sử dụng PostgreSQL `SELECT ... FOR UPDATE` kết hợp Atomic Conditional Decrement.
-- **Consequences**: Đảm bảo 100% không bán quá số lượng vé. Transaction bị lock có thể làm giảm throughput một chút, nhưng an toàn dữ liệu là ưu tiên cao nhất.
+### ADR 2: Khóa bi quan kết hợp conditional update
 
-### ADR 3: Cơ sở dữ liệu Relational (PostgreSQL) thay vì NoSQL
-- **Context**: Hệ thống bán vé yêu cầu tính nhất quán dữ liệu (ACID) cực kỳ cao giữa Order, Ticket, và Payment.
-- **Decision**: Chọn PostgreSQL.
-- **Consequences**: Đảm bảo toàn vẹn dữ liệu tốt nhất nhờ Foreign Keys, Transactions. Tuy nhiên, schema phải được thiết kế cứng và migrate cẩn thận.
+- **Bối cảnh:** Nhiều người tranh cùng loại vé có thể gây oversell và vượt giới hạn mỗi người.
+- **Quyết định:** `SELECT ... FOR UPDATE` trên `TicketType`, đếm quota rồi giảm `remainingQty` có điều kiện trong cùng transaction.
+- **Hệ quả:** Tính đúng đắn cao hơn nhưng transaction cùng loại vé bị tuần tự hóa.
 
-### ADR 4: Sử dụng BullMQ với Redis thay vì Kafka/RabbitMQ
-- **Context**: Cần xử lý các task bất đồng bộ (Gửi thông báo, Hủy đơn hàng hết hạn, Import CSV).
-- **Decision**: Chọn BullMQ chạy trên nền Redis.
-- **Consequences**: Dễ setup vì hệ thống đằng nào cũng dùng Redis cho Caching. Không cần maintain thêm cluster Kafka nặng nề, đủ đáp ứng throughput hiện tại.
-- **Cập nhật (scheduled CSV inbox)**: Import CSV giờ có hai lối vào cùng đổ vào một pipeline BullMQ (`guests` queue, xem `specs/csv-ingestion.md`): (1) upload thủ công từ Admin UI, và (2) `InboxPollerService` (`@Cron` mỗi 10s, `@nestjs/schedule`) quét thư mục mount `data/inbox/` để đáp ứng yêu cầu "định kỳ nhập". Cả hai gọi chung `GuestsService.ingestBuffer`, nên `GuestsProcessor` (worker) không đổi.
+### ADR 3: PostgreSQL thay vì NoSQL
 
----
+- **Bối cảnh:** Order, item, ticket và kho cần ACID, khóa ngoại và aggregate.
+- **Quyết định:** PostgreSQL là nguồn dữ liệu chuẩn, Prisma quản lý schema/migration.
+- **Hệ quả:** Quan hệ nhất quán; migration và thay đổi schema phải được kiểm soát.
 
-## 6. Mechanisms (Person B)
+### ADR 4: BullMQ/Redis thay vì Kafka hoặc RabbitMQ
 
-### 6.1. Rate Limiting (Mechanism #2)
+- **Bối cảnh:** Cần job cho hết hạn đơn, CSV và thông báo nhưng quy mô triển khai nhỏ.
+- **Quyết định:** Tái sử dụng Redis với BullMQ trong backend.
+- **Hệ quả:** Ít hạ tầng; Redis trở thành phụ thuộc chung và worker chưa cô lập deployment.
 
-- **Implementation**: Token Bucket pattern via Redis.
-- **Why**: Protect against traffic spikes (e.g. 80k requests/5m).
-- **ADR**: We chose Redis Token Bucket over memory caching to support horizontal scaling later, and to apply accurate rate limiting per IP/user identifier globally.
+### ADR 5: CSV inbox polling dùng chung pipeline upload
 
-### 6.2. Circuit Breaker (Mechanism #3)
+- **Bối cảnh:** Cần nhập định kỳ lẫn thao tác tức thời từ admin.
+- **Quyết định:** Cron quét bind mount mỗi 10 giây rồi gọi cùng `ingestBuffer`; checksum scoped theo concert.
+- **Hệ quả:** Không lặp logic parse; mô hình một poller cần nâng cấp lock nếu chạy nhiều backend.
 
-- **Implementation**: Mock gateway wrapped by a Circuit Breaker middleware.
-- **Why**: Handles payment gateway failure gracefully without blocking concert listing.
-- **ADR**: Selected `opossum` for Node.js circuit breaker. We could have used native try-catch logic but `opossum` implements a robust Open/Half-Open/Closed state machine.
+## 6. Các cơ chế kỹ thuật chính
 
-### 6.3. Idempotency For Payment (Mechanism #4a)
+### 6.1. Chống oversell và giới hạn mỗi người dùng
 
-- **Implementation**: Idempotency-Key header cached in Redis.
-- **Why**: Prevents double-charging if the user or app retries the same payment transaction.
-- **ADR**: Redis TTL-based idempotency was preferred to a pure relational model check due to the speed and efficiency of checking Redis before hitting the payment logic or database.
+Khóa dòng loại vé, đếm đơn `PAID` và `PENDING` còn hạn, sau đó conditional decrement. Xem [specs/purchase.md](specs/purchase.md).
 
-### 6.4. Caching (Mechanism #7)
+### 6.2. Rate limiting
 
-- **Implementation**: Cache-aside with Redis.
-- **Why**: DB load reduction for highly concurrent read endpoints (e.g., concert list and detail).
-- **ADR**: Selected Cache-aside over Read-through because of NestJS + Prisma constraints, and because we only need to cache hot data with a relatively short TTL. Explicit invalidation is done upon ticket purchase.
+Token bucket dùng Lua/Redis để chia sẻ trạng thái giữa instance. Khóa có thể theo IP hoặc user; login/register/payment/order có cấu hình chặt riêng. Redis lỗi hiện có thể làm request phụ thuộc guard thất bại, không phải limiter fail-open.
+
+### 6.3. Circuit Breaker
+
+`opossum` quản lý `CLOSED`, `OPEN`, `HALF-OPEN` quanh mock gateway. Trạng thái xem tại `GET /payment/status`; endpoint demo được guard bằng `ENABLE_DEMO_ENDPOINTS`.
+
+### 6.4. Idempotency
+
+- Tạo đơn: Redis `SET NX EX 86400` cộng unique `Order.idempotencyKey`.
+- Xác nhận: kiểm tra trạng thái đơn và conditional transition `PENDING → PAID`.
+- Check-in: UUID `clientLogId` cộng conditional transition `VALID → USED`.
+- CSV: unique `(concertId, checksum)`.
+
+### 6.5. Cache-aside
+
+Danh sách concert cache 2 phút, chi tiết theo slug cache 1 phút. Tạo/cập nhật/xóa/hủy concert và thao tác giữ kho vô hiệu hóa cache liên quan. Thay đổi trực tiếp `TicketType` hiện chưa invalidation nên public detail có thể cũ tối đa 60 giây; stats admin vẫn đọc thẳng DB.
+
+### 6.6. Đồng bộ ngoại tuyến
+
+Scanner dùng Dexie/IndexedDB cho snapshot và hai queue: vé thường, khách VIP. Sync chạy mỗi 10 giây và khi online; conflict khác thiết bị được phản hồi về UI. Xem [specs/checkin.md](specs/checkin.md).
+
+### 6.7. Tác vụ nền và thông báo
+
+Queue `orders`, `guests`, `notifications` cùng cron nhắc 24 giờ chạy trong backend. Email dùng Nodemailer, QR được sinh PNG và đính kèm. Xem [specs/notifications.md](specs/notifications.md) và [specs/csv-ingestion.md](specs/csv-ingestion.md).
