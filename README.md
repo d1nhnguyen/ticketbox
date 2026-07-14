@@ -99,6 +99,19 @@ Chi tiết C4 Level 1, C4 Level 2, data model, failure isolation và ADR: [`blue
 5. Mở **Thông báo** để xem thông báo trong app.
 6. Mở Mailpit tại <http://localhost:8025>. Email gửi tới `audience@ticketbox.dev` hiển thị người mua, concert, ticket type và QR của từng ticket.
 
+Mailpit chạy sẵn trong Compose, không cần cài đặt, tài khoản SMTP hay cấu hình Gmail. Backend trong Docker phải dùng `MAIL_HOST=mailpit`, `MAIL_PORT=1025`; `localhost:8025` chỉ mở đúng Mailpit khi trình duyệt ở trên cùng máy chạy Docker. Nếu xem từ máy khác, dùng `http://<IP-LAN-máy-Docker>:8025` và cho phép port `8025` qua firewall.
+
+Kiểm tra nhanh khi log backend báo gửi thành công nhưng inbox trống:
+
+```powershell
+docker compose ps mailpit backend redis
+docker compose exec backend printenv MAIL_HOST MAIL_PORT MAIL_SECURE
+Invoke-RestMethod http://localhost:8025/api/v1/info
+Invoke-RestMethod "http://localhost:8025/api/v1/messages?limit=50"
+```
+
+Kết quả env phải là `mailpit`, `1025`, `false`. `SMTPAccepted > 0` cho biết Mailpit đã nhận thư; `Messages > 0` cho biết inbox hiện có thư. Mailpit dùng database tạm để mỗi lần demo bắt đầu với inbox sạch; restart/recreate Mailpit sẽ xóa thư cũ. Vì vậy phải khởi động đủ stack trước, sau đó tạo một giao dịch mới rồi kiểm tra inbox.
+
 Luồng backend giữ stock trong transaction có row lock, enforce `maxPerUser` trên tổng `PENDING + PAID`, dùng idempotency để không tạo/charge hai lần, hoàn kho order hết hạn và invalidate cache liên quan. Xem [`blueprint/specs/purchase.md`](blueprint/specs/purchase.md), [`blueprint/specs/payment.md`](blueprint/specs/payment.md) và [`blueprint/specs/notifications.md`](blueprint/specs/notifications.md).
 
 ### 5.2 Ban tổ chức
@@ -159,6 +172,12 @@ Kiểm tra thông báo trong web, email trong Mailpit và log backend. Channel n
 ## 6. Cấu hình tùy chọn
 
 Docker Compose tự đọc file `.env` ở thư mục gốc. File này đã được gitignore; không commit secret thật.
+
+Không bắt buộc tạo `.env` để chạy mock-payment demo. Khi cần VNPay/AI, copy template rồi điền credential riêng:
+
+```powershell
+Copy-Item .env.example .env
+```
 
 ### 6.1 VNPay sandbox
 
@@ -390,6 +409,7 @@ ticketbox/
 | `GET /concerts` không có 4 concert | Fresh reset bằng `docker compose down -v`, rồi `docker compose up -d --build` |
 | Web không gọi được API | Kiểm tra backend `:3000` và `CORS_ALLOWED_ORIGINS` |
 | Không thấy email | Kiểm tra Mailpit `:8025`, `docker compose logs backend` và Redis/BullMQ |
+| Backend log `Email sent` nhưng Mailpit trống | Xác nhận đang mở `:8025` trên đúng máy; kiểm tra `MAIL_HOST=mailpit`, gọi `/api/v1/info`, xóa filter UI và tạo giao dịch mới sau lần restart/recreate Mailpit gần nhất |
 | CSV chưa được xử lý | Đợi ít nhất 15 giây; kiểm tra đúng mẫu tên, `processed/`, `failed/` và log backend |
 | VNPay báo giao dịch hết hạn | Đồng bộ giờ hệ điều hành, recreate backend và tạo order mới; không dùng lại URL thanh toán cũ |
 | VNPay callback thất bại | Kiểm tra đúng cặp TMN code/hash secret sandbox và return URL; không tự sửa query đã ký |

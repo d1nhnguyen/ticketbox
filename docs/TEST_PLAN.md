@@ -236,9 +236,9 @@ Tạo/điều chỉnh concert bắt đầu khoảng 24 giờ tới và có paid 
 2. Mở Mailpit tại `http://localhost:8025` và tìm email gửi tới đúng Audience.
 3. Kiểm tra buyer, concert, thời gian, ticket type và một QR riêng cho từng ticket.
 4. Đối chiếu giá trị QR/email với QR trong **Vé của tôi**, rồi quét bằng Scanner PWA.
-5. Để kiểm tra lỗi kênh, tạm làm SMTP không khả dụng và xem log/retry BullMQ; sau đó khôi phục Mailpit.
+5. Để kiểm tra lỗi kênh, tạm làm SMTP không khả dụng và xem log/retry BullMQ; sau đó khôi phục Mailpit và tạo giao dịch mới.
 
-**Mong đợi:** purchase tạo email local đúng người nhận và đủ e-ticket; QR quét được; lỗi email được log/retry nhưng không rollback order/ticket đã thanh toán; không yêu cầu production delivery audit.
+**Mong đợi:** purchase tạo email local đúng người nhận và đủ e-ticket; QR quét được; lỗi email được log/retry nhưng không rollback order/ticket đã thanh toán. Inbox được phép mất khi restart/recreate Mailpit vì đây là công cụ test local, không phải hệ thống lưu trữ email production.
 
 ## 9. Organizer
 
