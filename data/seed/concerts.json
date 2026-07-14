@@ -5,6 +5,8 @@
     "venue": "SVĐ Mỹ Đình, Hà Nội",
     "startsAt": "2026-08-15T19:00:00Z",
     "status": "ON_SALE",
+    "artists": ["Isaac", "Erik", "(S)TRONG Trọng Hiếu", "Dương Domic", "Quang Hùng MasterD", "Rhyder", "Anh Tú Atus", "Negav"],
+    "seatMapSvg": "<svg viewBox='0 0 800 600' xmlns='http://www.w3.org/2000/svg' style='width:100%;height:100%;min-height:400px;font-family:sans-serif'><rect x='250' y='20' width='300' height='70' rx='12' fill='#1e293b'/><text x='400' y='62' fill='#fff' font-size='24' font-weight='bold' text-anchor='middle' letter-spacing='2'>SÂN KHẤU</text><polygon points='220,110 580,110 620,190 180,190' fill='#f59e0b' stroke='#b45309' stroke-width='2'/><text x='400' y='155' text-anchor='middle' font-size='20' font-weight='bold' fill='#78350f'>SVIP</text><polygon points='180,200 620,200 660,290 140,290' fill='#f472b6' stroke='#be185d' stroke-width='2'/><text x='400' y='250' text-anchor='middle' font-size='20' font-weight='bold' fill='#831843'>VIP</text><polygon points='140,300 660,300 700,390 100,390' fill='#60a5fa' stroke='#1d4ed8' stroke-width='2'/><text x='400' y='350' text-anchor='middle' font-size='20' font-weight='bold' fill='#1e3a8a'>CAT 1</text><polygon points='100,400 700,400 740,480 60,480' fill='#4ade80' stroke='#15803d' stroke-width='2'/><text x='400' y='445' text-anchor='middle' font-size='20' font-weight='bold' fill='#14532d'>CAT 2</text><polygon points='60,490 740,490 780,570 20,570' fill='#cbd5e1' stroke='#64748b' stroke-width='2'/><text x='400' y='535' text-anchor='middle' font-size='20' font-weight='bold' fill='#334155'>GA (Đứng)</text></svg>",
     "ticketTypes": [
       {
         "name": "SVIP",
@@ -49,6 +51,8 @@
     "venue": "SVĐ Quân khu 7, TP.HCM",
     "startsAt": "2026-08-22T19:00:00Z",
     "status": "ON_SALE",
+    "artists": ["Tuấn Hưng", "Cường Seven", "Bằng Kiều", "Tự Long", "Soobin Hoàng Sơn", "Binz", "Rhymastic", "Wowy"],
+    "seatMapSvg": "<svg viewBox='0 0 800 600' xmlns='http://www.w3.org/2000/svg' style='width:100%;height:100%;min-height:400px;font-family:sans-serif'><rect x='250' y='20' width='300' height='70' rx='12' fill='#1e293b'/><text x='400' y='62' fill='#fff' font-size='24' font-weight='bold' text-anchor='middle' letter-spacing='2'>SÂN KHẤU</text><polygon points='220,110 580,110 620,190 180,190' fill='#f59e0b' stroke='#b45309' stroke-width='2'/><text x='400' y='155' text-anchor='middle' font-size='20' font-weight='bold' fill='#78350f'>SVIP</text><polygon points='180,200 620,200 660,290 140,290' fill='#f472b6' stroke='#be185d' stroke-width='2'/><text x='400' y='250' text-anchor='middle' font-size='20' font-weight='bold' fill='#831843'>VIP</text><polygon points='140,300 660,300 700,390 100,390' fill='#60a5fa' stroke='#1d4ed8' stroke-width='2'/><text x='400' y='350' text-anchor='middle' font-size='20' font-weight='bold' fill='#1e3a8a'>CAT 1</text><polygon points='100,400 700,400 740,480 60,480' fill='#4ade80' stroke='#15803d' stroke-width='2'/><text x='400' y='445' text-anchor='middle' font-size='20' font-weight='bold' fill='#14532d'>CAT 2</text><polygon points='60,490 740,490 780,570 20,570' fill='#cbd5e1' stroke='#64748b' stroke-width='2'/><text x='400' y='535' text-anchor='middle' font-size='20' font-weight='bold' fill='#334155'>GA (Đứng)</text></svg>",
     "ticketTypes": [
       {
         "name": "SVIP",
@@ -93,6 +97,8 @@
     "venue": "SVĐ Thống Nhất, TP.HCM",
     "startsAt": "2026-09-05T19:00:00Z",
     "status": "ON_SALE",
+    "artists": ["Tóc Tiên", "Bích Phương", "Miu Lê", "Phương Ly", "Orange", "AMEE", "Suni Hạ Linh"],
+    "seatMapSvg": "<svg viewBox='0 0 800 600' xmlns='http://www.w3.org/2000/svg' style='width:100%;height:100%;min-height:400px;font-family:sans-serif'><rect x='250' y='20' width='300' height='70' rx='12' fill='#1e293b'/><text x='400' y='62' fill='#fff' font-size='24' font-weight='bold' text-anchor='middle' letter-spacing='2'>SÂN KHẤU</text><polygon points='220,110 580,110 620,190 180,190' fill='#f59e0b' stroke='#b45309' stroke-width='2'/><text x='400' y='155' text-anchor='middle' font-size='20' font-weight='bold' fill='#78350f'>SVIP</text><polygon points='180,200 620,200 660,290 140,290' fill='#f472b6' stroke='#be185d' stroke-width='2'/><text x='400' y='250' text-anchor='middle' font-size='20' font-weight='bold' fill='#831843'>VIP</text><polygon points='140,300 660,300 700,390 100,390' fill='#60a5fa' stroke='#1d4ed8' stroke-width='2'/><text x='400' y='350' text-anchor='middle' font-size='20' font-weight='bold' fill='#1e3a8a'>CAT 1</text><polygon points='100,400 700,400 740,480 60,480' fill='#4ade80' stroke='#15803d' stroke-width='2'/><text x='400' y='445' text-anchor='middle' font-size='20' font-weight='bold' fill='#14532d'>CAT 2</text><polygon points='60,490 740,490 780,570 20,570' fill='#cbd5e1' stroke='#64748b' stroke-width='2'/><text x='400' y='535' text-anchor='middle' font-size='20' font-weight='bold' fill='#334155'>GA (Đứng)</text></svg>",
     "ticketTypes": [
       {
         "name": "SVIP",
@@ -137,6 +143,8 @@
     "venue": "SVĐ Cần Thơ",
     "startsAt": "2026-09-19T19:00:00Z",
     "status": "ON_SALE",
+    "artists": ["Mỹ Linh", "Hồng Nhung", "Thu Phương", "Minh Hằng", "Lệ Quyên", "Diệp Lâm Anh", "Uyên Linh"],
+    "seatMapSvg": "<svg viewBox='0 0 800 600' xmlns='http://www.w3.org/2000/svg' style='width:100%;height:100%;min-height:400px;font-family:sans-serif'><rect x='250' y='20' width='300' height='70' rx='12' fill='#1e293b'/><text x='400' y='62' fill='#fff' font-size='24' font-weight='bold' text-anchor='middle' letter-spacing='2'>SÂN KHẤU</text><polygon points='220,110 580,110 620,190 180,190' fill='#f59e0b' stroke='#b45309' stroke-width='2'/><text x='400' y='155' text-anchor='middle' font-size='20' font-weight='bold' fill='#78350f'>SVIP</text><polygon points='180,200 620,200 660,290 140,290' fill='#f472b6' stroke='#be185d' stroke-width='2'/><text x='400' y='250' text-anchor='middle' font-size='20' font-weight='bold' fill='#831843'>VIP</text><polygon points='140,300 660,300 700,390 100,390' fill='#60a5fa' stroke='#1d4ed8' stroke-width='2'/><text x='400' y='350' text-anchor='middle' font-size='20' font-weight='bold' fill='#1e3a8a'>CAT 1</text><polygon points='100,400 700,400 740,480 60,480' fill='#4ade80' stroke='#15803d' stroke-width='2'/><text x='400' y='445' text-anchor='middle' font-size='20' font-weight='bold' fill='#14532d'>CAT 2</text><polygon points='60,490 740,490 780,570 20,570' fill='#cbd5e1' stroke='#64748b' stroke-width='2'/><text x='400' y='535' text-anchor='middle' font-size='20' font-weight='bold' fill='#334155'>GA (Đứng)</text></svg>",
     "ticketTypes": [
       {
         "name": "SVIP",

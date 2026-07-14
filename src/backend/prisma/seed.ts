@@ -51,6 +51,8 @@ async function main() {
         venue: c.venue,
         startsAt: new Date(c.startsAt),
         status: c.status,
+        artists: c.artists ?? [],
+        seatMapSvg: c.seatMapSvg,
         ticketTypes: {
           create: c.ticketTypes.map((tt: any) => ({
             name: tt.name,

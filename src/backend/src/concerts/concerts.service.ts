@@ -130,6 +130,8 @@ export class ConcertsService {
         startsAt: true,
         status: true,
         artistBio: true,
+        artists: true,
+        seatMapSvg: true,
         createdAt: true,
         ticketTypes: {
           select: {
@@ -169,6 +171,7 @@ export class ConcertsService {
           startsAt: new Date(dto.startsAt),
           status: dto.status ?? ConcertStatus.DRAFT,
           artistBio: dto.artistBio,
+          artists: dto.artists ?? [],
           bioSourceUrl: dto.bioSourceUrl,
           seatMapSvg: dto.seatMapSvg,
         },
@@ -196,6 +199,7 @@ export class ConcertsService {
           ...(dto.startsAt !== undefined && { startsAt: new Date(dto.startsAt) }),
           ...(dto.status !== undefined && { status: dto.status }),
           ...(dto.artistBio !== undefined && { artistBio: dto.artistBio }),
+          ...(dto.artists !== undefined && { artists: dto.artists }),
           ...(dto.bioSourceUrl !== undefined && { bioSourceUrl: dto.bioSourceUrl }),
           ...(dto.seatMapSvg !== undefined && { seatMapSvg: dto.seatMapSvg }),
         },

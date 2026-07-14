@@ -228,6 +228,12 @@ export default function ConcertDetail() {
         <h1 style={{ fontSize: '2.5rem', marginBottom: '10px', color: '#000000ff' }}>{concert.title}</h1>
         <p style={{ fontSize: '1.1rem', color: '#4b5563', marginBottom: '20px', paddingTop: '30px' }}>📍 {concert.venue} &nbsp;|&nbsp; ⏰ {new Date(concert.startsAt).toLocaleString('vi-VN')}</p>
 
+        {Array.isArray(concert.artists) && concert.artists.length > 0 && (
+          <p style={{ fontSize: '1.05rem', color: '#111827', fontWeight: 600, marginBottom: '20px' }}>
+            🎤 {concert.artists.join(', ')}
+          </p>
+        )}
+
         {/* ===== AI Artist Bio ===== */}
         {concert.artistBio && (
           <div style={{
@@ -268,70 +274,77 @@ export default function ConcertDetail() {
           <div style={{ flex: '1 1 500px', background: '#f8fafc', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column' }}>
             <h3 style={{ fontSize: '1.3rem', marginBottom: '20px', color: '#334155', textAlign: 'center' }}>Sơ đồ & Tình trạng ghế</h3>
 
-            <svg viewBox="0 0 800 600" style={{ width: '100%', height: '100%', minHeight: '400px', userSelect: 'none' }}>
-              {/* Vẽ Sân Khấu (Stage) */}
-              <rect x="250" y="20" width="300" height="80" rx="15" fill="#1e293b" />
-              <text x="400" y="65" fill="white" fontSize="26" fontWeight="bold" textAnchor="middle" letterSpacing="2">SÂN KHẤU</text>
+            {concert.seatMapSvg ? (
+              <div
+                style={{ width: '100%', minHeight: '400px' }}
+                dangerouslySetInnerHTML={{ __html: concert.seatMapSvg }}
+              />
+            ) : (
+              <svg viewBox="0 0 800 600" style={{ width: '100%', height: '100%', minHeight: '400px', userSelect: 'none' }}>
+                {/* Vẽ Sân Khấu (Stage) */}
+                <rect x="250" y="20" width="300" height="80" rx="15" fill="#1e293b" />
+                <text x="400" y="65" fill="white" fontSize="26" fontWeight="bold" textAnchor="middle" letterSpacing="2">SÂN KHẤU</text>
 
-              {/* Render linh hoạt các khu vực ghế ngồi dựa trên dữ liệu thật của API */}
-              {concert.ticketTypes?.map((ticket: any, index: number) => {
-                const isSaleStarted = new Date() >= new Date(ticket.saleStartsAt);
-                const isSoldOut = ticket.remainingQty === 0;
-                const qtySelected = quantities[ticket.id] || 0;
-                const isSelected = qtySelected > 0;
-                const isLocked = (activeTicketTypeId && ticket.id !== activeTicketTypeId) || !isSaleStarted;
+                {/* Render linh hoạt các khu vực ghế ngồi dựa trên dữ liệu thật của API */}
+                {concert.ticketTypes?.map((ticket: any, index: number) => {
+                  const isSaleStarted = new Date() >= new Date(ticket.saleStartsAt);
+                  const isSoldOut = ticket.remainingQty === 0;
+                  const qtySelected = quantities[ticket.id] || 0;
+                  const isSelected = qtySelected > 0;
+                  const isLocked = (activeTicketTypeId && ticket.id !== activeTicketTypeId) || !isSaleStarted;
 
-                // Toán học để tự động xếp các khu vực thành 2 cột (Trái/Phải) và dồn dần về phía sau
-                const row = Math.floor(index / 2);
-                const col = index % 2;
-                const width = 300;
-                const height = 110;
-                const x = col === 0 ? 80 : 420;
-                const y = 140 + (row * 140);
+                  // Toán học để tự động xếp các khu vực thành 2 cột (Trái/Phải) và dồn dần về phía sau
+                  const row = Math.floor(index / 2);
+                  const col = index % 2;
+                  const width = 300;
+                  const height = 110;
+                  const x = col === 0 ? 80 : 420;
+                  const y = 140 + (row * 140);
 
-                // Logic Màu sắc: Xám (Hết vé hoặc bị khóa), Xanh đậm (Đang chọn), Xanh nhạt (Còn trống)
-                let fillColor = '#bae6fd';
-                let textColor = '#0369a1';
-                let strokeColor = '#7dd3fc';
+                  // Logic Màu sắc: Xám (Hết vé hoặc bị khóa), Xanh đậm (Đang chọn), Xanh nhạt (Còn trống)
+                  let fillColor = '#bae6fd';
+                  let textColor = '#0369a1';
+                  let strokeColor = '#7dd3fc';
 
-                if (isSoldOut || isLocked) {
-                  fillColor = '#f1f5f9';
-                  textColor = '#94a3b8';
-                  strokeColor = '#cbd5e1';
-                } else if (isSelected) {
-                  fillColor = '#3b82f6';
-                  textColor = '#ffffff';
-                  strokeColor = '#1d4ed8';
-                }
+                  if (isSoldOut || isLocked) {
+                    fillColor = '#f1f5f9';
+                    textColor = '#94a3b8';
+                    strokeColor = '#cbd5e1';
+                  } else if (isSelected) {
+                    fillColor = '#3b82f6';
+                    textColor = '#ffffff';
+                    strokeColor = '#1d4ed8';
+                  }
 
-                return (
-                  <g
-                    key={ticket.id}
-                    onClick={() => {
-                      if (!isSoldOut && !isLocked && qtySelected < ticket.maxPerUser) {
-                        // Tăng số lượng vé lên 1 khi click vào bản đồ
-                        handleQuantityChange(ticket.id, 1, ticket.maxPerUser, ticket.remainingQty);
-                      }
-                    }}
-                    style={{ cursor: (isSoldOut || isLocked) ? 'not-allowed' : 'pointer', transition: 'all 0.2s ease-in-out', opacity: isLocked ? 0.5 : 1 }}
-                  >
-                    <rect x={x} y={y} width={width} height={height} rx="12" fill={fillColor} stroke={strokeColor} strokeWidth={isSelected ? 4 : 2} />
-                    <text x={x + width / 2} y={y + 45} fill={textColor} fontSize="22" fontWeight="bold" textAnchor="middle">{ticket.name}</text>
-                    <text x={x + width / 2} y={y + 75} fill={isSelected ? '#bfdbfe' : textColor} fontSize="16" textAnchor="middle">
-                      {isSoldOut ? 'HẾT VÉ' : (!isSaleStarted ? 'CHƯA BÁN' : `Còn trống: ${ticket.remainingQty}`)}
-                    </text>
-                    {isSelected && (
-                      <circle cx={x + width - 25} cy={y + 25} r="15" fill="#10b981" />
-                    )}
-                    {isSelected && (
-                      <text x={x + width - 25} y={y + 31} fill="white" fontSize="16" fontWeight="bold" textAnchor="middle">{qtySelected}</text>
-                    )}
-                  </g>
-                );
-              })}
-            </svg>
+                  return (
+                    <g
+                      key={ticket.id}
+                      onClick={() => {
+                        if (!isSoldOut && !isLocked && qtySelected < ticket.maxPerUser) {
+                          // Tăng số lượng vé lên 1 khi click vào bản đồ
+                          handleQuantityChange(ticket.id, 1, ticket.maxPerUser, ticket.remainingQty);
+                        }
+                      }}
+                      style={{ cursor: (isSoldOut || isLocked) ? 'not-allowed' : 'pointer', transition: 'all 0.2s ease-in-out', opacity: isLocked ? 0.5 : 1 }}
+                    >
+                      <rect x={x} y={y} width={width} height={height} rx="12" fill={fillColor} stroke={strokeColor} strokeWidth={isSelected ? 4 : 2} />
+                      <text x={x + width / 2} y={y + 45} fill={textColor} fontSize="22" fontWeight="bold" textAnchor="middle">{ticket.name}</text>
+                      <text x={x + width / 2} y={y + 75} fill={isSelected ? '#bfdbfe' : textColor} fontSize="16" textAnchor="middle">
+                        {isSoldOut ? 'HẾT VÉ' : (!isSaleStarted ? 'CHƯA BÁN' : `Còn trống: ${ticket.remainingQty}`)}
+                      </text>
+                      {isSelected && (
+                        <circle cx={x + width - 25} cy={y + 25} r="15" fill="#10b981" />
+                      )}
+                      {isSelected && (
+                        <text x={x + width - 25} y={y + 31} fill="white" fontSize="16" fontWeight="bold" textAnchor="middle">{qtySelected}</text>
+                      )}
+                    </g>
+                  );
+                })}
+              </svg>
+            )}
             <p style={{ textAlign: 'center', fontSize: '0.9rem', color: '#64748b', marginTop: '15px' }}>
-              * Bấm trực tiếp vào khu vực trên bản đồ để chọn vé nhanh
+              {!concert.seatMapSvg && '* Bấm trực tiếp vào khu vực trên bản đồ để chọn vé nhanh'}
             </p>
           </div>
 

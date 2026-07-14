@@ -76,6 +76,7 @@ model Concert {
   startsAt     DateTime
   status       ConcertStatus @default(DRAFT)
   artistBio    String?       @db.Text
+  artists      String[]      @default([])
   bioSourceUrl String?
   seatMapSvg   String?       @db.Text
   createdAt    DateTime      @default(now())

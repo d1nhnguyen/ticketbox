@@ -4,6 +4,7 @@ import {
   IsDateString,
   IsOptional,
   IsEnum,
+  IsArray,
 } from 'class-validator';
 import { ConcertStatus } from '@prisma/client';
 
@@ -30,6 +31,11 @@ export class CreateConcertDto {
   @IsOptional()
   @IsString()
   artistBio?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  artists?: string[];
 
   @IsOptional()
   @IsString()
