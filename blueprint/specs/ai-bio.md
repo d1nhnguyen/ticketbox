@@ -4,6 +4,13 @@
 
 Ban tổ chức tải press kit dạng PDF; backend trích xuất văn bản, gửi prompt tiếng Việt đến nhà cung cấp AI đã cấu hình và lưu kết quả vào `Concert.artistBio`. Mã nguồn nằm trong `src/backend/src/ai-bio/`.
 
+### Lập luận thiết kế
+
+- Provider adapter được chọn để domain không phụ thuộc SDK/model cụ thể và có thể đổi Anthropic/Gemini/OpenAI bằng cấu hình.
+- Tác vụ AI không phải dữ liệu tài chính; khi provider lỗi, graceful degradation bằng đoạn trích PDF phù hợp hơn làm toàn request/backend thất bại.
+- Code hiện gọi AI đồng bộ để demo đơn giản và trả bio ngay, nhưng giữ connection lâu và làm latency phụ thuộc provider. Nếu file/tải tăng, nên chuyển thành job `PENDING → PROCESSING → COMPLETED/FAILED` qua BullMQ.
+- Việc gửi nội dung PDF ra bên thứ ba là privacy boundary; production cần consent, classification/redaction, retention policy và audit provider/model.
+
 ## 2. Luồng chính
 
 1. `ORGANIZER` gửi file PDF bằng multipart field `pdf` tới `POST /concerts/:id/bio`.

@@ -4,6 +4,14 @@
 
 Khán giả chọn một loại vé và số lượng, tạo đơn `PENDING` giữ kho trong 10 phút rồi xác nhận bằng cổng mock hoặc VNPay tùy cấu hình.
 
+## Lập luận thiết kế
+
+- **Pessimistic lock được chọn thay optimistic retry:** giờ mở bán tạo conflict cao trên cùng `TicketType`; retry optimistic có thể khuếch đại tải. Row lock làm giảm concurrency nhưng giúp phép đếm quota và giảm kho nằm trong một transaction dễ chứng minh.
+- **Conditional decrement vẫn được giữ:** lock là cơ chế điều phối, còn điều kiện `remainingQty >= quantity` là lớp invariant cuối ngăn kho âm.
+- **Không dùng Redis làm kho chuẩn:** Redis reservation nhanh hơn nhưng tạo dual-write và recovery phức tạp. PostgreSQL giữ nguồn sự thật; Redis chỉ chặn request lặp và giới hạn tải.
+- **Giữ chỗ 10 phút:** đủ cho redirect/thao tác payment trong demo và giải phóng vé bỏ dở; đây là policy cấu hình cần đo lại theo hành vi người dùng thật.
+- **Giới hạn throughput:** mọi order cùng loại vé bị tuần tự hóa tại hot row. Nếu lock-wait vượt SLO, hướng nâng cấp là admission/waiting-room queue theo loại vé, không bỏ invariant DB.
+
 ## Luồng chính
 
 1. Client gửi `POST /orders` với `{ ticketTypeId, quantity }`, JWT `AUDIENCE` và header `Idempotency-Key`.
@@ -28,6 +36,7 @@ Khán giả chọn một loại vé và số lượng, tạo đơn `PENDING` gi�
 - **Giới hạn mỗi người dùng khi có tải:** khóa dòng loại vé tuần tự hóa các giao dịch cùng loại trước khi đếm `PAID` và `PENDING` còn hạn.
 - **Idempotency:** Redis là đường nhanh; unique nullable `Order.idempotencyKey` trong PostgreSQL là lớp chặn bền vững.
 - **Rate limiting:** `POST /orders` dùng token bucket theo người dùng với capacity 150 và refill 10 token/giây.
+- Ngưỡng trên phục vụ kiểm thử hiện tại, chưa chứng minh fairness hay capacity production. Rate limit per-user không thay thế bot detection/waiting room và cần hiệu chỉnh từ load test.
 - Mỗi đơn hiện chứa một `OrderItem` vì DTO mua chỉ nhận một `ticketTypeId`.
 
 ## Tiêu chí chấp nhận

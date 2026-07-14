@@ -4,6 +4,15 @@
 
 Luồng mặc định gọi cổng thanh toán mô phỏng qua `PaymentGatewayService`, được bảo vệ bằng Circuit Breaker `opossum`. Khi cổng chậm hoặc lỗi, chỉ chức năng thanh toán suy giảm; API duyệt concert vẫn hoạt động. VNPay sandbox là lựa chọn bổ sung khi được bật bằng cấu hình.
 
+### Lập luận thiết kế
+
+- Chỉ đặt timeout vẫn tiếp tục dồn request vào gateway đang lỗi; retry vô hạn gây retry storm. Circuit Breaker được chọn để nhớ trạng thái dependency và fail-fast trong thời gian lỗi kéo dài.
+- Payment adapter giữ code nghiệp vụ độc lập provider; mỗi provider production nên có circuit riêng để lỗi VNPay không mở circuit của MoMo.
+- Bản hiện tại có mock và VNPay sandbox tùy chọn; MoMo mới là điểm mở rộng kiến trúc, chưa được tuyên bố là tích hợp đã cài đặt.
+- Không đưa public read vào cùng dependency chain, nên graceful degradation là: concert vẫn `200`, payment trả `503`, order còn `PENDING` trong thời gian giữ chỗ.
+- Mặc định `timeout=5s`, `errorThreshold=50%`, `volumeThreshold=5`, `resetTimeout=10s` giúp demo nhanh. Đây không phải ngưỡng production; cần hiệu chỉnh bằng p95 gateway, error budget và metric false-open.
+- Idempotency/conditional state transition vẫn bắt buộc vì Circuit Breaker chỉ cô lập lỗi, không ngăn tác dụng phụ lặp khi response thanh toán bị mất.
+
 ## 2. Luồng chính
 
 1. Khán giả tạo đơn bằng `POST /orders`; hệ thống tạo `Order(PENDING)` và giữ kho trong 10 phút.

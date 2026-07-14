@@ -4,6 +4,13 @@
 
 Hệ thống sử dụng JWT Bearer không trạng thái và phân quyền theo vai trò (RBAC) với ba vai trò: `AUDIENCE`, `ORGANIZER`, `SCANNER`. Mật khẩu được băm bằng bcrypt và không bao giờ được lưu hay trả về ở dạng văn bản thuần. JWT mang payload `{ sub, email, role }`; các endpoint khai báo bảo vệ bằng `@UseGuards(JwtAuthGuard, RolesGuard)` và `@Roles(...)`.
 
+### Lập luận lựa chọn JWT và RBAC
+
+- JWT được chọn thay server session để Web/PWA dùng cùng REST contract và backend có thể nhân bản không cần sticky session/shared session lookup.
+- Đánh đổi là token khó thu hồi tức thời và role có thể cũ đến khi hết hạn. Phạm vi hiện chưa có refresh/revocation; production cần access token ngắn hạn và refresh rotation/revocation, đặc biệt cho `ORGANIZER`/`SCANNER`.
+- RBAC phù hợp vì quyền hiện được gom ổn định theo ba vai trò. Nếu sau này quyền phụ thuộc concert cụ thể hoặc thuộc tính tài nguyên, cần bổ sung resource-based policy/ABAC thay vì tạo quá nhiều role.
+- UI guard chỉ cải thiện trải nghiệm; API guard mới là security boundary. Client không bao giờ được tự gán role khi đăng ký.
+
 Mã nguồn nằm tại `src/backend/src/auth/`.
 
 ## Luồng chính

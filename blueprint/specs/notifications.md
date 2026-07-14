@@ -4,6 +4,13 @@
 
 Hệ thống gửi email và thông báo trong ứng dụng bất đồng bộ qua BullMQ. Hai kênh hiện tại triển khai chung giao diện `NotificationChannel`: `EmailChannel` dùng Nodemailer/SMTP và `InAppChannel` ghi PostgreSQL. Trong Docker Compose, Mailpit nhận email phát triển tại cổng SMTP `1025` và hiển thị giao diện ở `http://localhost:8025`.
 
+### Lập luận thiết kế mở rộng kênh
+
+- `NotificationChannel` áp dụng Strategy/port: Order/Concert chỉ phát domain event, không chứa `if email/if Zalo`. Thêm kênh mới bằng implementation và registration nên giảm phạm vi thay đổi.
+- BullMQ được chọn thay gửi đồng bộ vì SMTP/Zalo/SMS là dependency chậm và có thể retry; thanh toán thành công không được rollback chỉ vì email lỗi.
+- Đánh đổi là eventual delivery và at-least-once. Channel phải idempotent hoặc có dedup key để retry không gửi trùng; cơ chế hiện tại cho reminder chưa có unique DB nên cần nâng cấp trước khi chạy nhiều scheduler instance.
+- `EventEmitter2` hiện là in-process: nếu tiến trình chết sau DB commit nhưng trước enqueue, event có thể mất. Production cần transactional outbox nếu yêu cầu không mất notification.
+
 ## 2. Luồng chính
 
 1. `NotificationsListener` nhận sự kiện `order.paid` hoặc `concert.cancelled` từ `EventEmitter2`.

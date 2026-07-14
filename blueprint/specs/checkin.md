@@ -75,6 +75,13 @@ Backend xử lý từng scan trong transaction riêng, đổi trạng thái vé 
 
 Hai thiết bị không liên lạc khi cùng offline không thể ngăn cùng quét một vé theo thời gian thực. Xung đột chỉ được phát hiện khi đồng bộ; đây là giới hạn tự nhiên của thiết kế offline-first.
 
+Điều này tạo khác biệt quan trọng giữa hai mức bảo đảm:
+
+- **Code hiện bảo đảm:** PostgreSQL chỉ chấp nhận một transition `VALID → USED`; audit giữ cả lần thắng và lần xung đột. Một vé chỉ có một check-in chính thức.
+- **Code hiện chưa bảo đảm:** hai scanner bị partition có thể cùng hiển thị “hợp lệ” và cho người qua trước khi sync. Vì vậy chưa thể tuyên bố tuyệt đối không có hai lượt vào cổng ở lớp vật lý.
+
+Để đạt bảo đảm vật lý nghiêm ngặt mà vẫn offline, deployment phải bổ sung ít nhất một cơ chế: chia ticket thành gate shard và mỗi gate chỉ chấp nhận shard của mình; edge server/LAN chia sẻ trạng thái giữa scanner; hoặc chỉ định một scanner offline có quyền trên mỗi partition. Gate partition làm giảm tính linh hoạt đổi cổng; edge server tăng hạ tầng tại sự kiện. Phạm vi hiện tại chọn availability và audit/reconcile, đồng thời công khai đánh đổi này.
+
 ## Ràng buộc
 
 - `DEVICE_ID` phải được lưu bền vững trên thiết bị để phục vụ audit.
