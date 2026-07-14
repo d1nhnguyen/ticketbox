@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Logger } from '@nestjs/common';
+import { Controller, Post, Body, Get, Logger, UseGuards } from '@nestjs/common';
 import { PaymentGatewayService } from './payment-gateway.service';
 import { VNPayService } from './vnpay.service';
 import type { PaymentRequest } from './payment.types';
@@ -6,6 +6,7 @@ import {
   SkipRateLimit,
   RateLimitConfig,
 } from 'src/common/decorators/rate-limit.decorator';
+import { DemoEnabledGuard } from 'src/common/guards/demo-enabled.guard';
 
 /**
  * PaymentController — exposes payment endpoints and a circuit-breaker status endpoint.
@@ -52,6 +53,7 @@ export class PaymentController {
     keyStrategy: 'ip',
   })
   @Post('charge')
+  @UseGuards(DemoEnabledGuard)
   async charge(@Body() body: PaymentRequest) {
     this.logger.log(`Charging order ${body.orderId} — amount: ${body.amount}`);
     const result = await this.gatewayService.charge(body);
@@ -75,6 +77,7 @@ export class PaymentController {
    * Skip rate limit so the test script can always call this.
    */
   @SkipRateLimit()
+  @UseGuards(DemoEnabledGuard)
   @Post('reset')
   resetCircuitBreaker() {
     this.gatewayService.reset();

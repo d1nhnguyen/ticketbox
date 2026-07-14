@@ -49,8 +49,9 @@ export class OrdersController {
   @Post(':id/fail')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.AUDIENCE)
-  async fail(@Param('id') id: string) {
-    return this.ordersService.failPayment(id);
+  async fail(@Req() req: any, @Param('id') id: string) {
+    const userId = req.user.userId;
+    return this.ordersService.failPayment(id, userId);
   }
 
   @Get('vnpay/url/:id')
@@ -64,8 +65,8 @@ export class OrdersController {
 
   @Get('vnpay/return')
   async vnpayReturn(@Query() query: any) {
-    // Note: VNPay return URL might be called directly by the user's browser, 
-    // so we handle it without JwtAuthGuard here, or we expect the frontend 
+    // Note: VNPay return URL might be called directly by the user's browser,
+    // so we handle it without JwtAuthGuard here, or we expect the frontend
     // to proxy this call. If frontend proxies, it can pass the query.
     return this.ordersService.handleVNPayReturn(query);
   }

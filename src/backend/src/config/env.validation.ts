@@ -75,4 +75,16 @@ export const envValidationSchema = Joi.object({
   // Rate limiting — payment/purchase endpoints (stricter bucket)
   PAYMENT_RATE_LIMIT_CAPACITY: Joi.number().integer().positive().default(20),
   PAYMENT_RATE_LIMIT_REFILL_RATE: Joi.number().positive().default(2),
+
+  // CORS — comma-separated allowlist of origins permitted to call the API.
+  CORS_ALLOWED_ORIGINS: Joi.string().default(
+    'http://localhost:5173,http://localhost:5174',
+  ),
+
+  // Demo/debug endpoints (payment charge/reset, reminder trigger) — off by
+  // default; must never be enabled in production.
+  ENABLE_DEMO_ENDPOINTS: Joi.boolean()
+    .truthy('true')
+    .falsy('false')
+    .default(false),
 });

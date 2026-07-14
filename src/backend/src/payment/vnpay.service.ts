@@ -3,6 +3,24 @@ import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import * as querystring from 'querystring';
 
+export interface VNPayReturnData {
+  orderId: string;
+  amountVND: number;
+  transactionNo?: string;
+  bankCode?: string;
+  payDate?: string;
+  responseCode?: string;
+}
+
+export type VNPayReturnResult =
+  | { success: true; code: string; message: string; data: VNPayReturnData }
+  | {
+      success: false;
+      code: string;
+      message: string;
+      data?: { orderId?: string };
+    };
+
 @Injectable()
 export class VNPayService {
   private vnpayUrl: string;
@@ -104,13 +122,8 @@ export class VNPayService {
    * Verify return URL from VNPay
    * @param query - Query parameters from VNPay
    */
-  verifyReturnUrl(query: any): {
-    success: boolean;
-    code: string;
-    message: string;
-    data?: any;
-  } {
-    if (!this.isEnabled()) {
+  verifyReturnUrl(query: any): VNPayReturnResult {
+    if (!this.isEnabled() || !this.hashSecret || !this.hashSecret.trim()) {
       return {
         success: false,
         code: '98',
@@ -139,11 +152,26 @@ export class VNPayService {
     const hmac = crypto.createHmac('sha512', this.hashSecret);
     const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
 
-    if (secureHash !== signed) {
+    const secureHashBuf = Buffer.from(secureHash ?? '', 'utf-8');
+    const signedBuf = Buffer.from(signed, 'utf-8');
+    const signatureValid =
+      secureHashBuf.length === signedBuf.length &&
+      crypto.timingSafeEqual(secureHashBuf, signedBuf);
+
+    if (!signatureValid) {
       return {
         success: false,
         code: '97',
         message: 'Invalid signature',
+      };
+    }
+
+    const currCode = vnpParams.vnp_CurrCode;
+    if (currCode !== 'VND') {
+      return {
+        success: false,
+        code: '04',
+        message: 'Invalid currency',
       };
     }
 

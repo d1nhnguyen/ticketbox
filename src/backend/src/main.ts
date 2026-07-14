@@ -6,16 +6,22 @@ import { envValidationSchema } from './config/env.validation';
 
 const logger = new Logger('Bootstrap');
 
-const { error: envError } = envValidationSchema.validate(process.env, {
+interface ValidatedEnv {
+  CORS_ALLOWED_ORIGINS: string;
+}
+
+const validation = envValidationSchema.validate(process.env, {
   allowUnknown: true,
   abortEarly: false,
-});
+}) as { error?: { details: { message: string }[] }; value: ValidatedEnv };
+
+const { error: envError, value: envVars } = validation;
 
 if (envError) {
   console.error(
     `\n[Bootstrap] Environment validation failed — fix your .env and restart.\n` +
-    envError.details.map((d) => `  • ${d.message}`).join('\n') +
-    '\n',
+      envError.details.map((d) => `  • ${d.message}`).join('\n') +
+      '\n',
   );
   process.exit(1);
 }
@@ -23,7 +29,15 @@ if (envError) {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  app.enableCors();
+  const allowedOrigins = String(envVars.CORS_ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .map((origin: string) => origin.trim())
+    .filter(Boolean);
+
+  app.enableCors({
+    origin: allowedOrigins,
+    credentials: false,
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({

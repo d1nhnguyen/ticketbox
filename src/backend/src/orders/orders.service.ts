@@ -31,7 +31,7 @@ export class OrdersService implements OnModuleInit {
     private readonly vnpay: VNPayService,
     private readonly eventEmitter: EventEmitter2,
     @InjectQueue('orders') private readonly ordersQueue: Queue,
-  ) { }
+  ) {}
 
   async onModuleInit() {
     await this.ordersQueue.add(
@@ -78,7 +78,7 @@ export class OrdersService implements OnModuleInit {
 
         const concert = await tx.concert.findUnique({
           where: { id: tt.concertId },
-          select: { slug: true }
+          select: { slug: true },
         });
 
         // ---- sale window ----
@@ -262,7 +262,16 @@ export class OrdersService implements OnModuleInit {
     return paid;
   }
 
-  async failPayment(orderId: string) {
+  async failPayment(orderId: string, userId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+    });
+    if (!order) {
+      throw new NotFoundException(`Order with ID ${orderId} not found`);
+    }
+    if (order.userId !== userId) {
+      throw new BadRequestException('Access denied to this order');
+    }
     return this.releaseOrder(orderId);
   }
 
@@ -364,7 +373,7 @@ export class OrdersService implements OnModuleInit {
   }
 
   // ─── VNPay Methods ────────────────────────────────────────────────────────
-  
+
   async getVNPayUrl(orderId: string, userId: string, ipAddress: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -382,24 +391,38 @@ export class OrdersService implements OnModuleInit {
     }
 
     const orderInfo = `Thanh toan ve concert ${order.concert.title || orderId}`;
-    const url = this.vnpay.createPaymentUrl(order.id, order.totalAmount, orderInfo, ipAddress);
+    const url = this.vnpay.createPaymentUrl(
+      order.id,
+      order.totalAmount,
+      orderInfo,
+      ipAddress,
+    );
     return { url };
   }
 
   async handleVNPayReturn(query: any) {
     const result = this.vnpay.verifyReturnUrl(query);
-    
+
     if (!result.success) {
-      // If payment failed (e.g., user cancelled), we don't automatically fail the order 
+      // If payment failed (e.g., user cancelled), we don't automatically fail the order
       // because they might retry. We just return the result.
       return result;
     }
 
     const orderId = result.data.orderId;
-    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
-    
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+    });
+
     if (!order) {
       return { success: false, code: '01', message: 'Order not found' };
+    }
+
+    // Validate the callback against the order BEFORE trusting anything about
+    // its current status — a tampered amount must never be accepted, even
+    // for an already-PAID order (replay) or a non-PENDING order.
+    if (result.data.amountVND !== order.totalAmount) {
+      return { success: false, code: '04', message: 'Amount mismatch' };
     }
 
     if (order.status === OrderStatus.PAID) {
@@ -407,7 +430,11 @@ export class OrdersService implements OnModuleInit {
     }
 
     if (order.status !== OrderStatus.PENDING) {
-      return { success: false, code: '02', message: `Order is ${order.status}` };
+      return {
+        success: false,
+        code: '02',
+        message: `Order is ${order.status}`,
+      };
     }
 
     // fulfill the order (flip status and issue tickets)
@@ -467,7 +494,9 @@ export class OrdersService implements OnModuleInit {
         });
 
         if (flip.count === 1) {
-          const items = await tx.orderItem.findMany({ where: { orderId: order.id } });
+          const items = await tx.orderItem.findMany({
+            where: { orderId: order.id },
+          });
           for (const item of items) {
             await tx.ticketType.update({
               where: { id: item.ticketTypeId },

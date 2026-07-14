@@ -149,6 +149,25 @@ VNPAY_RETURN_URL=http://localhost:5173/vnpay-return
 
 The backend refuses to start if VNPay is enabled with missing values. The web UI reads `GET /payment/methods`, so VNPay controls remain hidden until the backend reports a complete configuration. MoMo and production payment processing are out of scope.
 
+### CORS
+
+The backend only accepts cross-origin requests from the origins listed in `CORS_ALLOWED_ORIGINS` (comma-separated). It defaults to `http://localhost:5173,http://localhost:5174` (the web and scanner dev/Docker origins) — update it if you serve either frontend from a different host.
+
+### Demo/debug endpoints
+
+`POST /payment/charge`, `POST /payment/reset`, and `POST /debug/reminders/trigger` are demo-only surfaces used by the load-test scripts, not part of the real purchase flow (the real flow calls the payment gateway in-process). They are disabled by default and always disabled when `NODE_ENV=production` (as in the Docker profile). To run them locally, set both in `src/backend/.env`:
+
+```env
+ENABLE_DEMO_ENDPOINTS=true
+NODE_ENV=development
+```
+
+To run `scripts/load-test/circuit-breaker.js` or `scripts/load-test/test-reminder-cron.js` against the Docker stack, temporarily override the flag:
+
+```bash
+docker compose run -e ENABLE_DEMO_ENDPOINTS=true --rm backend
+```
+
 ---
 
 ## 7. Common tasks

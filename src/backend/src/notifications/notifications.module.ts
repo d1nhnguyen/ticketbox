@@ -10,6 +10,7 @@ import { NotificationsController } from './notifications.controller';
 import { EmailChannel } from './channels/email.channel';
 import { InAppChannel } from './channels/in-app.channel';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { DemoEnabledGuard } from 'src/common/guards/demo-enabled.guard';
 
 @Module({
   controllers: [ReminderDebugController, NotificationsController],
@@ -27,7 +28,8 @@ import { PrismaService } from 'src/prisma/prisma.service';
     EmailChannel,
     InAppChannel,
     PrismaService,
+    DemoEnabledGuard,
   ],
   exports: [NotificationsService],
 })
-export class NotificationsModule { }
+export class NotificationsModule {}

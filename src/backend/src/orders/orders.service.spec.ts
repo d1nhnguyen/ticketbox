@@ -198,3 +198,311 @@ describe('OrdersService.confirmPayment', () => {
     );
   });
 });
+
+describe('OrdersService.failPayment', () => {
+  let service: OrdersService;
+  let prisma: any;
+  let tx: any;
+
+  const pendingOrder = (overrides: Partial<any> = {}) => ({
+    id: ORDER_ID,
+    userId: USER_ID,
+    status: OrderStatus.PENDING,
+    totalAmount: 5000,
+    concert: null,
+    ...overrides,
+  });
+
+  beforeEach(async () => {
+    tx = {
+      order: {
+        updateMany: jest.fn(),
+        findUnique: jest.fn(),
+      },
+      orderItem: {
+        findMany: jest.fn(),
+      },
+      ticketType: {
+        update: jest.fn(),
+      },
+    };
+
+    prisma = {
+      order: { findUnique: jest.fn() },
+      $transaction: jest.fn((cb: any) => cb(tx)),
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        OrdersService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: REDIS_CLIENT, useValue: {} },
+        { provide: PaymentGatewayService, useValue: { charge: jest.fn() } },
+        { provide: VNPayService, useValue: { verifyReturnUrl: jest.fn() } },
+        { provide: CacheService, useValue: { invalidateConcert: jest.fn() } },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        { provide: getQueueToken('orders'), useValue: { add: jest.fn() } },
+      ],
+    }).compile();
+
+    service = module.get<OrdersService>(OrdersService);
+  });
+
+  it('rejects failing an order the user does not own', async () => {
+    prisma.order.findUnique.mockResolvedValue(
+      pendingOrder({ userId: 'someone-else' }),
+    );
+
+    await expect(service.failPayment(ORDER_ID, USER_ID)).rejects.toThrow(
+      BadRequestException,
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('throws NotFound for a missing order', async () => {
+    prisma.order.findUnique.mockResolvedValue(null);
+
+    await expect(service.failPayment(ORDER_ID, USER_ID)).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+
+  it('releases stock and flips to FAILED for the real owner', async () => {
+    prisma.order.findUnique.mockResolvedValue(pendingOrder());
+    tx.order.updateMany.mockResolvedValue({ count: 1 });
+    tx.orderItem.findMany.mockResolvedValue([
+      { ticketTypeId: 'tt-1', quantity: 2 },
+    ]);
+    tx.order.findUnique.mockResolvedValue({
+      id: ORDER_ID,
+      status: OrderStatus.FAILED,
+    });
+
+    await service.failPayment(ORDER_ID, USER_ID);
+
+    expect(tx.ticketType.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { remainingQty: { increment: 2 } },
+      }),
+    );
+  });
+});
+
+describe('OrdersService.handleVNPayReturn', () => {
+  let service: OrdersService;
+  let prisma: any;
+  let vnpay: { verifyReturnUrl: jest.Mock };
+  let tx: any;
+
+  const pendingOrder = (overrides: Partial<any> = {}) => ({
+    id: ORDER_ID,
+    userId: USER_ID,
+    status: OrderStatus.PENDING,
+    totalAmount: 5000,
+    ...overrides,
+  });
+
+  beforeEach(async () => {
+    tx = {
+      order: {
+        updateMany: jest.fn(),
+        findUnique: jest.fn(),
+      },
+      orderItem: {
+        findMany: jest.fn(),
+      },
+      ticket: {
+        create: jest.fn(),
+      },
+    };
+
+    prisma = {
+      order: { findUnique: jest.fn() },
+      $transaction: jest.fn((cb: any) => cb(tx)),
+    };
+
+    vnpay = { verifyReturnUrl: jest.fn() };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        OrdersService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: REDIS_CLIENT, useValue: {} },
+        { provide: PaymentGatewayService, useValue: { charge: jest.fn() } },
+        { provide: VNPayService, useValue: vnpay },
+        { provide: CacheService, useValue: { invalidateConcert: jest.fn() } },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        { provide: getQueueToken('orders'), useValue: { add: jest.fn() } },
+      ],
+    }).compile();
+
+    service = module.get<OrdersService>(OrdersService);
+  });
+
+  it('never fulfills the order when the callback signature/verification fails', async () => {
+    vnpay.verifyReturnUrl.mockReturnValue({
+      success: false,
+      code: '97',
+      message: 'Invalid signature',
+    });
+
+    const result = await service.handleVNPayReturn({});
+
+    expect(prisma.order.findUnique).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a callback for a non-existent order without fulfilling anything', async () => {
+    vnpay.verifyReturnUrl.mockReturnValue({
+      success: true,
+      code: '00',
+      data: { orderId: ORDER_ID, amountVND: 5000 },
+    });
+    prisma.order.findUnique.mockResolvedValue(null);
+
+    const result = await service.handleVNPayReturn({});
+
+    expect(result).toEqual({
+      success: false,
+      code: '01',
+      message: 'Order not found',
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('rejects a callback whose amount does not match the order total', async () => {
+    vnpay.verifyReturnUrl.mockReturnValue({
+      success: true,
+      code: '00',
+      data: { orderId: ORDER_ID, amountVND: 999 },
+    });
+    prisma.order.findUnique.mockResolvedValue(pendingOrder());
+
+    const result = await service.handleVNPayReturn({});
+
+    expect(result).toEqual({
+      success: false,
+      code: '04',
+      message: 'Amount mismatch',
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('rejects an amount-mismatched replay against an already-PAID order', async () => {
+    vnpay.verifyReturnUrl.mockReturnValue({
+      success: true,
+      code: '00',
+      data: { orderId: ORDER_ID, amountVND: 999 },
+    });
+    prisma.order.findUnique.mockResolvedValue(
+      pendingOrder({ status: OrderStatus.PAID }),
+    );
+
+    const result = await service.handleVNPayReturn({});
+
+    expect(result).toEqual({
+      success: false,
+      code: '04',
+      message: 'Amount mismatch',
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('fulfills the order when signature, order id, and amount all match', async () => {
+    vnpay.verifyReturnUrl.mockReturnValue({
+      success: true,
+      code: '00',
+      data: { orderId: ORDER_ID, amountVND: 5000 },
+    });
+    prisma.order.findUnique.mockResolvedValue(pendingOrder());
+    tx.order.updateMany.mockResolvedValue({ count: 1 });
+    tx.orderItem.findMany.mockResolvedValue([
+      { ticketTypeId: 'tt-1', quantity: 1 },
+    ]);
+    tx.order.findUnique.mockResolvedValue({
+      id: ORDER_ID,
+      status: OrderStatus.PAID,
+    });
+
+    const result = await service.handleVNPayReturn({});
+
+    expect(tx.ticket.create).toHaveBeenCalledTimes(1);
+    expect(result.success).toBe(true);
+  });
+});
+
+describe('OrdersService cross-user access (read/pay)', () => {
+  let service: OrdersService;
+  let prisma: any;
+
+  const pendingOrder = (overrides: Partial<any> = {}) => ({
+    id: ORDER_ID,
+    userId: USER_ID,
+    status: OrderStatus.PENDING,
+    totalAmount: 5000,
+    concert: { title: 'Test Concert' },
+    ...overrides,
+  });
+
+  beforeEach(async () => {
+    prisma = {
+      order: { findUnique: jest.fn() },
+      $transaction: jest.fn(),
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        OrdersService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: REDIS_CLIENT, useValue: {} },
+        { provide: PaymentGatewayService, useValue: { charge: jest.fn() } },
+        {
+          provide: VNPayService,
+          useValue: { createPaymentUrl: jest.fn(), verifyReturnUrl: jest.fn() },
+        },
+        { provide: CacheService, useValue: { invalidateConcert: jest.fn() } },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        { provide: getQueueToken('orders'), useValue: { add: jest.fn() } },
+      ],
+    }).compile();
+
+    service = module.get<OrdersService>(OrdersService);
+  });
+
+  it('rejects reading (findOne) an order the user does not own', async () => {
+    prisma.order.findUnique.mockResolvedValue(
+      pendingOrder({ userId: 'someone-else' }),
+    );
+
+    await expect(service.findOne(ORDER_ID, USER_ID)).rejects.toThrow(
+      BadRequestException,
+    );
+  });
+
+  it('throws NotFound when reading a missing order', async () => {
+    prisma.order.findUnique.mockResolvedValue(null);
+
+    await expect(service.findOne(ORDER_ID, USER_ID)).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+
+  it('rejects generating a VNPay pay URL for an order the user does not own', async () => {
+    prisma.order.findUnique.mockResolvedValue(
+      pendingOrder({ userId: 'someone-else' }),
+    );
+
+    await expect(
+      service.getVNPayUrl(ORDER_ID, USER_ID, '127.0.0.1'),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('throws NotFound when requesting a pay URL for a missing order', async () => {
+    prisma.order.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.getVNPayUrl(ORDER_ID, USER_ID, '127.0.0.1'),
+    ).rejects.toThrow(NotFoundException);
+  });
+});
