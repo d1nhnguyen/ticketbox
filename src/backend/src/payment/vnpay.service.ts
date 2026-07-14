@@ -167,7 +167,10 @@ export class VNPayService {
     }
 
     const currCode = vnpParams.vnp_CurrCode;
-    if (currCode !== 'VND') {
+    // VNPay requires VND on the payment request, but its documented Return URL
+    // payload does not include vnp_CurrCode. Validate it defensively only when
+    // the field is present instead of rejecting a legitimate signed callback.
+    if (currCode !== undefined && currCode !== 'VND') {
       return {
         success: false,
         code: '04',
