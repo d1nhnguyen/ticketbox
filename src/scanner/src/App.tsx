@@ -175,7 +175,7 @@ export default function App() {
       </main>
 
       {/* Bottom Navigation */}
-      <nav style={{ position: 'fixed', bottom: 0, width: '100%', background: 'white', display: 'flex', borderTop: '1px solid #e5e7eb', zIndex: 10 }}>
+      <nav style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '1126px', background: 'white', display: 'flex', borderTop: '1px solid #e5e7eb', zIndex: 10, boxSizing: 'border-box' }}>
         <button
           onClick={() => setActiveTab('SCANNER')}
           style={{ flex: 1, padding: '15px', border: 'none', background: 'none', color: activeTab === 'SCANNER' ? '#2563eb' : '#6b7280', fontWeight: activeTab === 'SCANNER' ? 700 : 500, fontSize: '1rem', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }}

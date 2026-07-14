@@ -27,6 +27,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setRole(null);
     localStorage.removeItem('token');
     localStorage.removeItem('role');
+    window.location.href = '/';
   };
 
   return (
