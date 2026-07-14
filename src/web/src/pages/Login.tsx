@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+import apiClient from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 
 export default function Login() {
@@ -15,7 +15,7 @@ export default function Login() {
     e.preventDefault();
     setError(''); setLoading(true);
     try {
-      const res = await axios.post('http://localhost:3000/auth/login', { email, password });
+      const res = await apiClient.post('/auth/login', { email, password });
       const token = res.data.access_token;
       if (!token) throw new Error("Không nhận được token");
 

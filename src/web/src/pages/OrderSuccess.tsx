@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import axios from 'axios';
+import apiClient from '../api/client';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../hooks/useAuth';
 
@@ -17,8 +17,8 @@ export default function OrderSuccess() {
 
     const confirmOrder = async () => {
       try {
-        const response = await axios.post(
-          `http://localhost:3000/orders/${id}/confirm`,
+        const response = await apiClient.post(
+          `/orders/${id}/confirm`,
           {},
           {
             headers: {

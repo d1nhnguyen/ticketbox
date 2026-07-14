@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import apiClient from '../api/client';
 
 export default function VNPayReturn() {
   const [searchParams] = useSearchParams();
@@ -13,7 +13,7 @@ export default function VNPayReturn() {
       try {
         // Send the entire query string to the backend for verification
         const queryString = searchParams.toString();
-        const res = await axios.get(`http://localhost:3000/orders/vnpay/return?${queryString}`);
+        const res = await apiClient.get(`/orders/vnpay/return?${queryString}`);
 
         if (res.data.success) {
           setStatus('success');
@@ -27,7 +27,7 @@ export default function VNPayReturn() {
             try {
               const token = localStorage.getItem('token');
               if (token) {
-                await axios.post(`http://localhost:3000/orders/${res.data.data.orderId}/fail`, {}, {
+                await apiClient.post(`/orders/${res.data.data.orderId}/fail`, {}, {
                   headers: { Authorization: `Bearer ${token}` }
                 });
               }

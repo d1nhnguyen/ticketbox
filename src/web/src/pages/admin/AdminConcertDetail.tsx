@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import apiClient from '../../api/client';
 import { useAuth } from '../../hooks/useAuth';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -56,7 +56,7 @@ interface ConcertStats {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const API = 'http://localhost:3000';
+
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '9px 12px', borderRadius: '8px',
@@ -118,7 +118,7 @@ export default function AdminConcertDetail() {
 
   const fetchConcert = async () => {
     try {
-      const res = await axios.get(`${API}/admin/concerts/${id}`, { headers: authHeader });
+      const res = await apiClient.get(`/admin/concerts/${id}`, { headers: authHeader });
       setConcert(res.data);
       // Sync edit form whenever concert data refreshes
       setEditForm({
@@ -137,7 +137,7 @@ export default function AdminConcertDetail() {
 
   const fetchStats = async () => {
     try {
-      const res = await axios.get<ConcertStats>(`${API}/admin/concerts/${id}/stats`, {
+      const res = await apiClient.get<ConcertStats>(`/admin/concerts/${id}/stats`, {
         headers: authHeader,
       });
       setStats(res.data);
@@ -148,14 +148,14 @@ export default function AdminConcertDetail() {
 
   const fetchBatches = async () => {
     try {
-      const res = await axios.get(`${API}/admin/concerts/${id}/guests/batches`, { headers: authHeader });
+      const res = await apiClient.get(`/admin/concerts/${id}/guests/batches`, { headers: authHeader });
       setBatches(res.data);
     } catch { /* silent */ }
   };
 
   const fetchGuests = async () => {
     try {
-      const res = await axios.get(`${API}/admin/concerts/${id}/guests/list`, { headers: authHeader });
+      const res = await apiClient.get(`/admin/concerts/${id}/guests/list`, { headers: authHeader });
       setGuests(res.data);
     } catch { /* silent */ }
   };
@@ -198,12 +198,12 @@ export default function AdminConcertDetail() {
     setIsSavingTt(true); setTtError(''); setTtSuccess('');
     try {
       if (editTt) {
-        await axios.patch(`${API}/admin/ticket-types/${editTt.id}`,
+        await apiClient.patch(`/admin/ticket-types/${editTt.id}`,
           { name, price: Number(price), totalQty: Number(totalQty), maxPerUser: Number(maxPerUser), saleStartsAt: new Date(saleStartsAt).toISOString() },
           { headers: authHeader });
         setTtSuccess(`✅ Đã cập nhật hạng vé "${name}"`);
       } else {
-        await axios.post(`${API}/admin/ticket-types`,
+        await apiClient.post(`/admin/ticket-types`,
           { concertId: id, name, price: Number(price), totalQty: Number(totalQty), maxPerUser: Number(maxPerUser), saleStartsAt: new Date(saleStartsAt).toISOString() },
           { headers: authHeader });
         setTtSuccess(`✅ Đã tạo hạng vé "${name}"`);
@@ -219,7 +219,7 @@ export default function AdminConcertDetail() {
   const handleDeleteTt = async (tt: TicketType) => {
     if (!confirm(`Xóa hạng vé "${tt.name}"? Chỉ xóa được nếu chưa có vé nào bán.`)) return;
     try {
-      await axios.delete(`${API}/admin/ticket-types/${tt.id}`, { headers: authHeader });
+      await apiClient.delete(`/admin/ticket-types/${tt.id}`, { headers: authHeader });
       await Promise.all([fetchConcert(), fetchStats()]);
     } catch (err: any) {
       alert(err.response?.data?.message || 'Không thể xóa hạng vé này.');
@@ -234,8 +234,8 @@ export default function AdminConcertDetail() {
     }
     setIsSavingInfo(true); setInfoError(''); setInfoSuccess('');
     try {
-      await axios.patch(
-        `${API}/admin/concerts/${id}`,
+      await apiClient.patch(
+        `/admin/concerts/${id}`,
         {
           title: editForm.title,
           venue: editForm.venue,
@@ -268,7 +268,7 @@ export default function AdminConcertDetail() {
     setIsUploadingBio(true); setBioError('');
     const fd = new FormData(); fd.append('pdf', pdfFile);
     try {
-      await axios.post(`${API}/concerts/${id}/bio`, fd, {
+      await apiClient.post(`/concerts/${id}/bio`, fd, {
         headers: { ...authHeader, 'Content-Type': 'multipart/form-data' },
       });
       setPdfFile(null);
@@ -301,7 +301,7 @@ export default function AdminConcertDetail() {
     setIsUploadingCsv(true); setCsvError('');
     const fd = new FormData(); fd.append('file', csvFile);
     try {
-      await axios.post(`${API}/admin/concerts/${id}/guests/upload`, fd, {
+      await apiClient.post(`/admin/concerts/${id}/guests/upload`, fd, {
         headers: { ...authHeader, 'Content-Type': 'multipart/form-data' },
       });
       setCsvFile(null);
@@ -506,7 +506,7 @@ export default function AdminConcertDetail() {
                 onClick={async () => {
                   if (!confirm(`Hủy concert "${concert?.title}"? Hành động này KHÔNG THỂ hoàn tác.`)) return;
                   try {
-                    await axios.post(`${API}/admin/concerts/${id}/cancel`, {}, { headers: authHeader });
+                    await apiClient.post(`/admin/concerts/${id}/cancel`, {}, { headers: authHeader });
                     navigate('/admin');
                   } catch (err: any) {
                     alert(err.response?.data?.message || 'Không thể hủy concert.');

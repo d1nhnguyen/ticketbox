@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+import apiClient from '../api/client';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -14,7 +14,7 @@ export default function Register() {
     e.preventDefault();
     setError(''); setLoading(true);
     try {
-      await axios.post('http://localhost:3000/auth/register', { email, password });
+      await apiClient.post('/auth/register', { email, password });
       setSuccess(true);
       setTimeout(() => {
         navigate('/login');

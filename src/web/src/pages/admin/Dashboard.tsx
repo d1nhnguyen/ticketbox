@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import apiClient from '../../api/client';
 import { useAuth } from '../../hooks/useAuth';
 
 interface ConcertStats {
@@ -31,15 +31,15 @@ export default function Dashboard() {
 
   const fetchAdminData = async () => {
     try {
-      const resConcerts = await axios.get('http://localhost:3000/admin/concerts', {
+      const resConcerts = await apiClient.get('/admin/concerts', {
         headers: { Authorization: `Bearer ${token}` },
       });
       setConcerts(resConcerts.data);
 
       const statsResponses = await Promise.all(
         resConcerts.data.map((concert: any) =>
-          axios.get<ConcertStats>(
-            `http://localhost:3000/admin/concerts/${concert.id}/stats`,
+          apiClient.get<ConcertStats>(
+            `/admin/concerts/${concert.id}/stats`,
             { headers: { Authorization: `Bearer ${token}` } },
           ),
         ),
@@ -75,7 +75,7 @@ export default function Dashboard() {
     if (!window.confirm('Bạn có chắc chắn muốn hủy sự kiện này? Hành động này không thể hoàn tác.')) return;
 
     try {
-      await axios.delete(`http://localhost:3000/admin/concerts/${id}`, {
+      await apiClient.delete(`/admin/concerts/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setConcerts(concerts.filter((c) => c.id !== id));
@@ -110,8 +110,8 @@ export default function Dashboard() {
     setCreateSuccess('');
 
     try {
-      await axios.post(
-        'http://localhost:3000/admin/concerts',
+      await apiClient.post(
+        '/admin/concerts',
         { title, venue, startsAt: new Date(startsAt).toISOString(), slug, status: createForm.status },
         { headers: { Authorization: `Bearer ${token}` } }
       );

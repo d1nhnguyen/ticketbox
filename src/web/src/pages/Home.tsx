@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
+import apiClient from '../api/client';
 
 export default function Home() {
   const [concerts, setConcerts] = useState<any[]>([]);
@@ -8,7 +8,7 @@ export default function Home() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    axios.get('http://localhost:3000/concerts')
+    apiClient.get('/concerts')
       .then(res => setConcerts(res.data))
       .catch(err => {
         console.error("Lỗi fetch concerts:", err);

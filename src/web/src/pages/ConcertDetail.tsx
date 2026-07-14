@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
-import axios from 'axios';
+import apiClient from '../api/client';
 import { QRCodeSVG } from 'qrcode.react';
 import DOMPurify from 'dompurify';
 
@@ -37,7 +37,7 @@ export default function ConcertDetail() {
       }
 
       if (orderId && token) {
-        axios.post(`http://localhost:3000/orders/${orderId}/fail`, {}, {
+        apiClient.post(`/orders/${orderId}/fail`, {}, {
           headers: {
             Authorization: `Bearer ${token}`
           }
@@ -54,7 +54,7 @@ export default function ConcertDetail() {
 
     const fetchConcert = async () => {
       try {
-        const res = await axios.get(`http://localhost:3000/concerts/${slug}`);
+        const res = await apiClient.get(`/concerts/${slug}`);
         if (isMounted) {
           setConcert(res.data);
           setLoading(false); // Chỉ tắt loading ở lần gọi đầu tiên để UI không bị giật
@@ -168,8 +168,8 @@ export default function ConcertDetail() {
     const idempotencyKey = crypto.randomUUID();
 
     try {
-      const response = await axios.post(
-        'http://localhost:3000/orders',
+      const response = await apiClient.post(
+        '/orders',
         {
           ticketTypeId: selectedItem.ticketTypeId,
           quantity: selectedItem.quantity
@@ -185,8 +185,8 @@ export default function ConcertDetail() {
       const orderId = response.data.id;
 
       if (paymentMethod === 'VNPAY' && vnpayEnabled) {
-        const vnpayRes = await axios.get(
-          `http://localhost:3000/orders/vnpay/url/${orderId}`,
+        const vnpayRes = await apiClient.get(
+          `/orders/vnpay/url/${orderId}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         window.location.href = vnpayRes.data.url;

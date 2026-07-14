@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import apiClient from '../../api/client';
 import { useAuth } from '../../hooks/useAuth';
 
 export default function AiBioUpload() {
@@ -16,8 +16,8 @@ export default function AiBioUpload() {
   const [dragOver, setDragOver] = useState(false);
 
   useEffect(() => {
-    axios
-      .get('http://localhost:3000/admin/concerts', {
+    apiClient
+      .get('/admin/concerts', {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then((res) => {
@@ -61,8 +61,8 @@ export default function AiBioUpload() {
     formData.append('pdf', file);
 
     try {
-      const res = await axios.post(
-        `http://localhost:3000/concerts/${selectedConcertId}/bio`,
+      const res = await apiClient.post(
+        `/concerts/${selectedConcertId}/bio`,
         formData,
         {
           headers: {

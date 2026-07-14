@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import apiClient from '../../api/client';
 import { useAuth } from '../../hooks/useAuth';
 
 interface BatchResult {
@@ -26,8 +26,8 @@ export default function CsvUpload() {
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    axios
-      .get('http://localhost:3000/admin/concerts', {
+    apiClient
+      .get('/admin/concerts', {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then((res) => {
@@ -46,8 +46,8 @@ export default function CsvUpload() {
 
     pollingRef.current = setInterval(async () => {
       try {
-        const res = await axios.get(
-          `http://localhost:3000/admin/concerts/${concertId}/guests/batches`,
+        const res = await apiClient.get(
+          `/admin/concerts/${concertId}/guests/batches`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         const batches: BatchResult[] = res.data;
@@ -98,8 +98,8 @@ export default function CsvUpload() {
     formData.append('file', file);
 
     try {
-      const res = await axios.post(
-        `http://localhost:3000/admin/concerts/${selectedConcertId}/guests/upload`,
+      const res = await apiClient.post(
+        `/admin/concerts/${selectedConcertId}/guests/upload`,
         formData,
         {
           headers: {

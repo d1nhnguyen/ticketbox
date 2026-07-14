@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import axios from 'axios';
+import apiClient from '../api/client';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../hooks/useAuth';
 import { Navigate } from 'react-router-dom';
@@ -24,7 +24,7 @@ export default function AudienceDashboard() {
 
   const fetchOrders = async () => {
     try {
-      const res = await axios.get('http://localhost:3000/orders', {
+      const res = await apiClient.get('/orders', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setOrders(res.data);
@@ -44,8 +44,8 @@ export default function AudienceDashboard() {
     setPayingOrderId(order.id);
     try {
       if (method === 'VNPAY') {
-        const vnpayRes = await axios.get(
-          `http://localhost:3000/orders/vnpay/url/${order.id}`,
+        const vnpayRes = await apiClient.get(
+          `/orders/vnpay/url/${order.id}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         window.location.href = vnpayRes.data.url;
