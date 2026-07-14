@@ -97,7 +97,7 @@ export default function OrderSuccess() {
         border: '1px solid #e2e8f0',
         fontFamily: 'system-ui, -apple-system, sans-serif'
       }}>
-        <div style={{ fontSize: '4rem', marginBottom: '20px' }}>⏳</div>
+        <div style={{ fontSize: '4rem', marginBottom: '20px' }}></div>
         <h2 style={{ color: '#d97706', marginBottom: '15px' }}>Đang Xử Lý Giao Dịch Trễ</h2>
         <div style={{
           background: '#fffbeb',
@@ -155,7 +155,7 @@ export default function OrderSuccess() {
         border: '1px solid #fee2e2',
         fontFamily: 'system-ui, -apple-system, sans-serif'
       }}>
-        <div style={{ fontSize: '4rem', marginBottom: '20px' }}>❌</div>
+        <div style={{ fontSize: '4rem', marginBottom: '20px' }}></div>
         <h2 style={{ color: '#dc2626', marginBottom: '15px' }}>Xác Nhận Thất Bại</h2>
         <p style={{ color: '#475569', marginBottom: '25px', lineHeight: '1.6' }}>
           {error || 'Không tìm thấy thông tin đơn hàng này hoặc bạn không có quyền truy cập.'}
@@ -237,7 +237,7 @@ export default function OrderSuccess() {
                   {order.concert?.title || 'Concert Ticket'}
                 </h2>
                 <p style={{ margin: '0 0 20px 0', opacity: 0.8, fontSize: '0.95rem' }}>
-                  📍 {order.concert?.venue}
+                  {order.concert?.venue}
                 </p>
               </div>
 

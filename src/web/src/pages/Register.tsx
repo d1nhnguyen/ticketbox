@@ -30,7 +30,7 @@ export default function Register() {
     return (
       <div style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ background: 'white', padding: '40px', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', textAlign: 'center', width: '100%', maxWidth: '400px' }}>
-          <h2 style={{ color: '#16a34a', marginBottom: '10px' }}>✅ Đăng ký thành công</h2>
+          <h2 style={{ color: '#16a34a', marginBottom: '10px' }}>Đăng ký thành công</h2>
           <p style={{ color: '#4b5563' }}>Tự động chuyển hướng đến trang đăng nhập...</p>
         </div>
       </div>

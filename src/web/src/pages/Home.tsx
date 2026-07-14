@@ -29,8 +29,8 @@ export default function Home() {
               <div style={{ height: '150px', background: 'linear-gradient(to right, #3b82f6, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold' }}>Image Placeholder</div>
               <div style={{ padding: '20px' }}>
                 <h3 style={{ fontSize: '1.25rem', marginBottom: '10px', color: '#111827' }}>{c.title}</h3>
-                <p style={{ color: '#4b5563', marginBottom: '5px', fontSize: '0.9rem' }}>📍 {c.venue}</p>
-                <p style={{ color: '#4b5563', marginBottom: '20px', fontSize: '0.9rem' }}>⏰ {new Date(c.startsAt).toLocaleString('vi-VN')}</p>
+                <p style={{ color: '#4b5563', marginBottom: '5px', fontSize: '0.9rem' }}>{c.venue}</p>
+                <p style={{ color: '#4b5563', marginBottom: '20px', fontSize: '0.9rem' }}>{new Date(c.startsAt).toLocaleString('vi-VN')}</p>
                 <Link to={`/concert/${c.slug}`} style={{ display: 'block', textAlign: 'center', background: '#111827', color: 'white', padding: '10px 0', textDecoration: 'none', borderRadius: '8px', fontWeight: 'bold' }}>Xem chi tiết</Link>
               </div>
             </div>

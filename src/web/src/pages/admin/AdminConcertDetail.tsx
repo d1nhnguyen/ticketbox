@@ -372,7 +372,7 @@ export default function AdminConcertDetail() {
               <span style={badgeStyle(sc, sbg, sbd)}>{concert.status}</span>
             </div>
             <p style={{ margin: 0, color: '#94a3b8', fontSize: '1rem' }}>
-              📍 {concert.venue} &nbsp;·&nbsp; ⏰ {new Date(concert.startsAt).toLocaleString('vi-VN')}
+              {concert.venue} &nbsp;·&nbsp; {new Date(concert.startsAt).toLocaleString('vi-VN')}
             </p>
             <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '0.82rem' }}>ID: {concert.id}</p>
           </div>
@@ -393,12 +393,11 @@ export default function AdminConcertDetail() {
         </div>
       </div>
 
-      {/* ── Tabs ── */}
       <div style={{ borderBottom: '1px solid #e5e7eb', marginBottom: '0', display: 'flex', gap: '4px' }}>
-        <TabBtn tab="info" label="✏️ Thông tin" />
-        <TabBtn tab="tickets" label="🎟️ Hạng vé" />
-        <TabBtn tab="bio" label="🤖 AI Artist Bio" />
-        <TabBtn tab="guests" label="📋 Guest List (CSV)" />
+        <TabBtn tab="info" label="Thông tin" />
+        <TabBtn tab="tickets" label="Hạng vé" />
+        <TabBtn tab="bio" label="AI Artist Bio" />
+        <TabBtn tab="guests" label="Guest List (CSV)" />
       </div>
 
       <div style={{ background: 'white', borderRadius: '0 0 16px 16px', border: '1px solid #e5e7eb', borderTop: 'none', padding: '28px', boxShadow: '0 4px 16px rgba(0,0,0,0.05)' }}>
@@ -406,11 +405,11 @@ export default function AdminConcertDetail() {
         {/* ══════════════ TAB: EDIT INFO ══════════════ */}
         {activeTab === 'info' && (
           <div>
-            <h2 style={{ margin: '0 0 24px', fontSize: '1.2rem', fontWeight: 700, color: '#111827' }}>✏️ Chỉnh sửa thông tin Concert</h2>
+            <h2 style={{ margin: '0 0 24px', fontSize: '1.2rem', fontWeight: 700, color: '#111827' }}>Chỉnh sửa thông tin Concert</h2>
 
             {infoError && (
               <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '12px 16px', color: '#dc2626', marginBottom: '20px', fontSize: '0.9rem' }}>
-                ⚠️ {infoError}
+                {infoError}
               </div>
             )}
             {infoSuccess && (
@@ -463,10 +462,10 @@ export default function AdminConcertDetail() {
                   value={editForm.status}
                   onChange={e => setEditForm(p => ({ ...p, status: e.target.value }))}
                 >
-                  <option value="ON_SALE">🟢 ON_SALE — Công khai với khán giả</option>
-                  <option value="DRAFT">⬜ DRAFT — Ẩn (chưa công bố)</option>
-                  <option value="SOLD_OUT">🔴 SOLD_OUT — Hết vé</option>
-                  <option value="CANCELLED">❌ CANCELLED — Đã hủy</option>
+                  <option value="ON_SALE">ON_SALE — Công khai với khán giả</option>
+                  <option value="DRAFT">DRAFT — Ẩn (chưa công bố)</option>
+                  <option value="SOLD_OUT">SOLD_OUT — Hết vé</option>
+                  <option value="CANCELLED">CANCELLED — Đã hủy</option>
                 </select>
               </div>
             </div>
@@ -482,7 +481,7 @@ export default function AdminConcertDetail() {
                   color: isSavingInfo ? '#9ca3af' : 'white',
                 }}
               >
-                {isSavingInfo ? '⏳ Đang lưu...' : '💾 Lưu thay đổi'}
+                {isSavingInfo ? 'Đang lưu...' : 'Lưu thay đổi'}
               </button>
               <button
                 onClick={() => {
@@ -492,13 +491,13 @@ export default function AdminConcertDetail() {
                 }}
                 style={{ padding: '11px 20px', border: '1.5px solid #d1d5db', borderRadius: '9px', background: 'white', color: '#6b7280', fontWeight: 600, cursor: 'pointer', fontSize: '0.9rem' }}
               >
-                ↺ Khôi phục
+                Khôi phục
               </button>
             </div>
 
             {/* Danger zone */}
             <div style={{ marginTop: '40px', padding: '20px', border: '1.5px solid #fecaca', borderRadius: '12px', background: '#fff5f5' }}>
-              <h3 style={{ margin: '0 0 8px', color: '#dc2626', fontSize: '1rem', fontWeight: 700 }}>⚠️ Vùng nguy hiểm</h3>
+              <h3 style={{ margin: '0 0 8px', color: '#dc2626', fontSize: '1rem', fontWeight: 700 }}>Vùng nguy hiểm</h3>
               <p style={{ margin: '0 0 14px', color: '#9b1c1c', fontSize: '0.88rem' }}>
                 Hủy concert sẽ void toàn bộ vé VALID và gửi thông báo đến người mua. Không thể hoàn tác.
               </p>
@@ -514,7 +513,7 @@ export default function AdminConcertDetail() {
                 }}
                 style={{ padding: '10px 22px', background: '#dc2626', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem' }}
               >
-                🚫 Hủy Concert
+                Hủy Concert
               </button>
             </div>
           </div>
@@ -537,10 +536,10 @@ export default function AdminConcertDetail() {
             {/* Form */}
             <div style={{ background: editTt ? '#fffbeb' : '#f8fafc', border: `1.5px solid ${editTt ? '#fde68a' : '#e2e8f0'}`, borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
               <h3 style={{ margin: '0 0 16px', fontSize: '1rem', fontWeight: 700, color: '#374151' }}>
-                {editTt ? `✏️ Chỉnh sửa: ${editTt.name}` : '➕ Thêm hạng vé mới'}
+                {editTt ? `Chỉnh sửa: ${editTt.name}` : 'Thêm hạng vé mới'}
               </h3>
 
-              {ttError && <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '10px 14px', color: '#dc2626', marginBottom: '14px', fontSize: '0.9rem' }}>⚠️ {ttError}</div>}
+              {ttError && <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '10px 14px', color: '#dc2626', marginBottom: '14px', fontSize: '0.9rem' }}>{ttError}</div>}
               {ttSuccess && <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '10px 14px', color: '#059669', marginBottom: '14px', fontSize: '0.9rem' }}>{ttSuccess}</div>}
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginBottom: '14px' }}>
@@ -575,7 +574,7 @@ export default function AdminConcertDetail() {
                   color: isSavingTt ? '#9ca3af' : 'white',
                 }}
               >
-                {isSavingTt ? '⏳ Đang lưu...' : (editTt ? '💾 Cập nhật hạng vé' : '➕ Thêm hạng vé')}
+                {isSavingTt ? 'Đang lưu...' : (editTt ? 'Cập nhật hạng vé' : 'Thêm hạng vé')}
               </button>
             </div>
 
@@ -618,8 +617,8 @@ export default function AdminConcertDetail() {
                           <td style={{ padding: '12px 14px', color: '#4b5563' }}>{tt.maxPerUser}/người</td>
                           <td style={{ padding: '12px 14px', color: '#6b7280', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>{new Date(tt.saleStartsAt).toLocaleDateString('vi-VN')}</td>
                           <td style={{ padding: '12px 14px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                            <button onClick={() => openEditTt(tt)} style={{ background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '5px 12px', cursor: 'pointer', marginRight: '6px', fontSize: '0.82rem', fontWeight: 500 }}>✏️ Sửa</button>
-                            <button onClick={() => handleDeleteTt(tt)} style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '6px', padding: '5px 12px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 500 }}>🗑️ Xóa</button>
+                            <button onClick={() => openEditTt(tt)} style={{ background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '5px 12px', cursor: 'pointer', marginRight: '6px', fontSize: '0.82rem', fontWeight: 500 }}>Sửa</button>
+                            <button onClick={() => handleDeleteTt(tt)} style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '6px', padding: '5px 12px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 500 }}>Xóa</button>
                           </td>
                         </tr>
                       );
@@ -634,22 +633,20 @@ export default function AdminConcertDetail() {
         {/* ══════════════ TAB: AI BIO ══════════════ */}
         {activeTab === 'bio' && (
           <div>
-            <h2 style={{ margin: '0 0 20px', fontSize: '1.2rem', fontWeight: 700, color: '#111827' }}>🤖 AI Artist Bio</h2>
+            <h2 style={{ margin: '0 0 20px', fontSize: '1.2rem', fontWeight: 700, color: '#111827' }}>AI Artist Bio</h2>
 
             {/* Current bio */}
             {concert.artistBio ? (
               <div style={{ marginBottom: '28px', background: 'linear-gradient(135deg, #f5f3ff, #ede9fe)', border: '1px solid #c4b5fd', borderLeft: '4px solid #7c3aed', borderRadius: '12px', padding: '20px 24px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-                  <span>🤖</span>
                   <span style={{ fontWeight: 700, color: '#7c3aed', fontSize: '0.82rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Bio hiện tại</span>
                   <span style={{ marginLeft: 'auto', cursor: 'pointer', color: '#7c3aed', fontSize: '0.82rem', fontWeight: 600, border: '1px solid #c4b5fd', borderRadius: '6px', padding: '3px 10px', background: 'white' }}
-                    onClick={() => navigator.clipboard.writeText(concert.artistBio!)}>📋 Copy</span>
+                    onClick={() => navigator.clipboard.writeText(concert.artistBio!)}>Copy</span>
                 </div>
                 <p style={{ color: '#3730a3', lineHeight: 1.8, margin: 0, fontSize: '0.97rem', whiteSpace: 'pre-wrap' }}>{concert.artistBio}</p>
               </div>
             ) : (
               <div style={{ marginBottom: '24px', background: '#f9fafb', border: '1.5px dashed #d1d5db', borderRadius: '12px', padding: '24px', textAlign: 'center', color: '#9ca3af' }}>
-                <div style={{ fontSize: '2rem', marginBottom: '8px' }}>🤖</div>
                 <p style={{ margin: 0, fontWeight: 500 }}>Chưa có AI Artist Bio. Upload press-kit PDF để tạo.</p>
               </div>
             )}
@@ -657,7 +654,7 @@ export default function AdminConcertDetail() {
             {/* Upload zone */}
             <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '24px' }}>
               <h3 style={{ margin: '0 0 16px', fontSize: '1rem', fontWeight: 700, color: '#374151' }}>
-                {concert.artistBio ? '🔄 Tạo lại Bio (upload PDF mới)' : '📄 Upload Press-kit PDF'}
+                {concert.artistBio ? 'Tạo lại Bio (upload PDF mới)' : 'Upload Press-kit PDF'}
               </h3>
 
               <div
@@ -674,13 +671,13 @@ export default function AdminConcertDetail() {
               >
                 <input id="bio-pdf-input" type="file" accept="application/pdf" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f?.type === 'application/pdf') { setPdfFile(f); setBioError(''); } else if (f) setBioError('Chỉ nhận PDF.'); }} />
                 {pdfFile ? (
-                  <><div style={{ fontSize: '2rem', marginBottom: '6px' }}>📑</div><div style={{ fontWeight: 700, color: '#059669' }}>{pdfFile.name}</div><div style={{ color: '#6b7280', fontSize: '0.82rem' }}>{(pdfFile.size / 1024).toFixed(1)} KB</div></>
+                  <><div style={{ fontWeight: 700, color: '#059669' }}>{pdfFile.name}</div><div style={{ color: '#6b7280', fontSize: '0.82rem' }}>{(pdfFile.size / 1024).toFixed(1)} KB</div></>
                 ) : (
-                  <><div style={{ fontSize: '2rem', marginBottom: '6px' }}>☁️</div><div style={{ fontWeight: 600, color: '#374151' }}>Kéo thả PDF hoặc bấm để chọn</div><div style={{ color: '#9ca3af', fontSize: '0.82rem', marginTop: '4px' }}>Chỉ nhận PDF · Tối đa 20MB</div></>
+                  <><div style={{ fontWeight: 600, color: '#374151' }}>Kéo thả PDF hoặc bấm để chọn</div><div style={{ color: '#9ca3af', fontSize: '0.82rem', marginTop: '4px' }}>Chỉ nhận PDF · Tối đa 20MB</div></>
                 )}
               </div>
 
-              {bioError && <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '10px 14px', color: '#dc2626', marginBottom: '14px', fontSize: '0.9rem' }}>⚠️ {bioError}</div>}
+              {bioError && <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '10px 14px', color: '#dc2626', marginBottom: '14px', fontSize: '0.9rem' }}>{bioError}</div>}
 
               <button
                 onClick={handleUploadBio}
@@ -692,7 +689,7 @@ export default function AdminConcertDetail() {
                   color: isUploadingBio || !pdfFile ? '#9ca3af' : 'white',
                 }}
               >
-                {isUploadingBio ? '⏳ AI đang phân tích...' : '🚀 Tạo Bio bằng AI'}
+                {isUploadingBio ? 'AI đang phân tích...' : 'Tạo Bio bằng AI'}
               </button>
             </div>
           </div>
@@ -701,14 +698,14 @@ export default function AdminConcertDetail() {
         {/* ══════════════ TAB: GUEST LIST ══════════════ */}
         {activeTab === 'guests' && (
           <div>
-            <h2 style={{ margin: '0 0 20px', fontSize: '1.2rem', fontWeight: 700, color: '#111827' }}>📋 Guest List — CSV Import</h2>
+            <h2 style={{ margin: '0 0 20px', fontSize: '1.2rem', fontWeight: 700, color: '#111827' }}>Guest List — CSV Import</h2>
 
             {/* Upload zone */}
             <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '24px', marginBottom: '28px' }}>
-              <h3 style={{ margin: '0 0 14px', fontSize: '1rem', fontWeight: 700, color: '#374151' }}>📤 Upload CSV mới</h3>
+              <h3 style={{ margin: '0 0 14px', fontSize: '1rem', fontWeight: 700, color: '#374151' }}>Import CSV mới</h3>
 
               <div style={{ background: '#eff6ff', borderRadius: '8px', border: '1px solid #bfdbfe', padding: '10px 14px', marginBottom: '14px', fontSize: '0.82rem', color: '#1e40af' }}>
-                <strong>💡 Files demo:</strong> <code>guests-valid.csv</code> · <code>guests-with-errors.csv</code> · <code>guests-duplicates.csv</code>
+                <strong>Files demo:</strong> <code>guests-valid.csv</code> · <code>guests-with-errors.csv</code> · <code>guests-duplicates.csv</code>
               </div>
 
               <div
@@ -725,13 +722,13 @@ export default function AdminConcertDetail() {
               >
                 <input id="guest-csv-input" type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f && (f.name.endsWith('.csv') || f.type === 'text/csv')) { setCsvFile(f); setCsvError(''); } else if (f) setCsvError('Chỉ nhận CSV.'); }} />
                 {csvFile ? (
-                  <><div style={{ fontSize: '2rem', marginBottom: '6px' }}>📊</div><div style={{ fontWeight: 700, color: '#059669' }}>{csvFile.name}</div><div style={{ color: '#6b7280', fontSize: '0.82rem' }}>{(csvFile.size / 1024).toFixed(1)} KB</div></>
+                  <><div style={{ fontWeight: 700, color: '#059669' }}>{csvFile.name}</div><div style={{ color: '#6b7280', fontSize: '0.82rem' }}>{(csvFile.size / 1024).toFixed(1)} KB</div></>
                 ) : (
-                  <><div style={{ fontSize: '2rem', marginBottom: '6px' }}>☁️</div><div style={{ fontWeight: 600, color: '#374151' }}>Kéo thả CSV hoặc bấm để chọn</div></>
+                  <><div style={{ fontWeight: 600, color: '#374151' }}>Kéo thả CSV hoặc bấm để chọn</div></>
                 )}
               </div>
 
-              {csvError && <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '10px 14px', color: '#dc2626', marginBottom: '12px', fontSize: '0.9rem' }}>⚠️ {csvError}</div>}
+              {csvError && <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '10px 14px', color: '#dc2626', marginBottom: '12px', fontSize: '0.9rem' }}>{csvError}</div>}
 
               <button
                 onClick={handleUploadCsv}
@@ -743,15 +740,15 @@ export default function AdminConcertDetail() {
                   color: isUploadingCsv || !csvFile ? '#9ca3af' : 'white',
                 }}
               >
-                {isUploadingCsv ? '⏳ Đang gửi...' : '📤 Import CSV'}
+                {isUploadingCsv ? 'Đang gửi...' : 'Import CSV'}
               </button>
             </div>
 
             {/* Batch history */}
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#374151' }}>📜 Lịch sử Import</h3>
-                <button onClick={() => { fetchBatches(); fetchGuests(); }} style={{ background: 'none', border: '1px solid #d1d5db', borderRadius: '6px', padding: '5px 12px', cursor: 'pointer', color: '#4b5563', fontSize: '0.82rem' }}>🔄 Refresh</button>
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#374151' }}>Lịch sử Import</h3>
+                <button onClick={() => { fetchBatches(); fetchGuests(); }} style={{ background: 'none', border: '1px solid #d1d5db', borderRadius: '6px', padding: '5px 12px', cursor: 'pointer', color: '#4b5563', fontSize: '0.82rem' }}>Refresh</button>
               </div>
 
               {batches.length === 0 ? (
@@ -760,23 +757,23 @@ export default function AdminConcertDetail() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {batches.map(b => {
                     const statusMap: Record<string, [string, string, string, string]> = {
-                      SUCCESS: ['✅', '#059669', '#f0fdf4', '#bbf7d0'],
-                      FAILED: ['❌', '#dc2626', '#fef2f2', '#fecaca'],
-                      PROCESSING: ['⏳', '#d97706', '#fffbeb', '#fde68a'],
+                      SUCCESS: ['', '#059669', '#f0fdf4', '#bbf7d0'],
+                      FAILED: ['', '#dc2626', '#fef2f2', '#fecaca'],
+                      PROCESSING: ['', '#d97706', '#fffbeb', '#fde68a'],
                     };
-                    const [icon, sc2, sbg2, sbd2] = statusMap[b.status] ?? ['❓', '#9ca3af', '#f9fafb', '#e5e7eb'];
+                    const [icon, sc2, sbg2, sbd2] = statusMap[b.status] ?? ['', '#9ca3af', '#f9fafb', '#e5e7eb'];
                     return (
                       <div key={b.id} style={{ background: 'white', border: '1px solid #f3f4f6', borderRadius: '10px', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '1.2rem' }}>{icon}</span>
+                        {icon && <span style={{ fontSize: '1.2rem' }}>{icon}</span>}
                         <div style={{ flex: 1, minWidth: '160px' }}>
                           <div style={{ fontWeight: 600, color: '#111827', fontSize: '0.9rem' }}>{b.filename}</div>
                           <div style={{ color: '#9ca3af', fontSize: '0.78rem' }}>{new Date(b.createdAt).toLocaleString('vi-VN')}</div>
                         </div>
                         <span style={badgeStyle(sc2, sbg2, sbd2)}>{b.status}</span>
                         <div style={{ display: 'flex', gap: '12px', fontSize: '0.82rem', fontWeight: 600 }}>
-                          <span style={{ color: '#374151' }}>📊 {b.rowsTotal} dòng</span>
-                          <span style={{ color: '#059669' }}>✅ {b.rowsOk}</span>
-                          <span style={{ color: '#dc2626' }}>❌ {b.rowsFailed}</span>
+                          <span style={{ color: '#374151' }}>{b.rowsTotal} dòng</span>
+                          <span style={{ color: '#059669' }}>{b.rowsOk}</span>
+                          <span style={{ color: '#dc2626' }}>{b.rowsFailed}</span>
                         </div>
                       </div>
                     );

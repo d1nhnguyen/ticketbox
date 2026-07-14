@@ -204,7 +204,7 @@ export default function AudienceDashboard() {
                           {ticket.concert?.title}
                         </h3>
                         <p style={{ fontSize: '0.85rem', margin: '0 0 15px 0', opacity: 0.8 }}>
-                          📍 {ticket.concert?.venue}
+                          {ticket.concert?.venue}
                         </p>
 
                         <div style={{ borderTop: '1px dashed rgba(255, 255, 255, 0.2)', paddingTop: '15px', display: 'flex', justifyContent: 'space-between' }}>

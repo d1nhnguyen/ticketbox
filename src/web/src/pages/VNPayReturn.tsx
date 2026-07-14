@@ -50,7 +50,7 @@ export default function VNPayReturn() {
     <div style={{ maxWidth: '600px', margin: '60px auto', padding: '30px', background: 'white', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', textAlign: 'center' }}>
       {status === 'loading' && (
         <div>
-          <div style={{ fontSize: '3rem', marginBottom: '20px' }}>⏳</div>
+          <div style={{ fontSize: '3rem', marginBottom: '20px' }}></div>
           <h2 style={{ color: '#4b5563', marginBottom: '10px' }}>{message}</h2>
           <p style={{ color: '#9ca3af' }}>Vui lòng không đóng trình duyệt lúc này.</p>
         </div>
@@ -58,7 +58,7 @@ export default function VNPayReturn() {
 
       {status === 'success' && (
         <div>
-          <div style={{ fontSize: '4rem', marginBottom: '20px' }}>✅</div>
+          <div style={{ fontSize: '4rem', marginBottom: '20px' }}></div>
           <h2 style={{ color: '#10b981', fontSize: '1.8rem', marginBottom: '15px' }}>{message}</h2>
           <p style={{ color: '#4b5563', marginBottom: '25px', lineHeight: '1.6' }}>
             Đơn hàng của bạn đã được xác nhận. Vé điện tử QR đã được phát hành thành công.
@@ -74,7 +74,7 @@ export default function VNPayReturn() {
 
       {status === 'error' && (
         <div>
-          <div style={{ fontSize: '4rem', marginBottom: '20px' }}>❌</div>
+          <div style={{ fontSize: '4rem', marginBottom: '20px' }}></div>
           <h2 style={{ color: '#ef4444', fontSize: '1.8rem', marginBottom: '15px' }}>Giao dịch không thành công</h2>
           <p style={{ color: '#4b5563', marginBottom: '25px', padding: '15px', background: '#fef2f2', borderRadius: '8px', border: '1px solid #fee2e2' }}>
             {message}

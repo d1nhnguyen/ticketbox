@@ -230,11 +230,11 @@ export default function ConcertDetail() {
           padding: '40px',
           textAlign: 'center',
         }}>
-          <div style={{ fontSize: '4rem', marginBottom: '16px' }}>🚫</div>
+          <div style={{ fontSize: '4rem', marginBottom: '16px' }}></div>
           <h1 style={{ fontSize: '2rem', color: '#b91c1c', marginBottom: '12px' }}>Sự kiện đã bị hủy</h1>
           <h2 style={{ fontSize: '1.3rem', color: '#374151', marginBottom: '12px' }}>{concert.title}</h2>
           <p style={{ color: '#6b7280', fontSize: '1rem', marginBottom: '8px' }}>
-            📍 {concert.venue} &nbsp;|&nbsp; ⏰ {new Date(concert.startsAt).toLocaleString('vi-VN')}
+            {concert.venue} &nbsp;|&nbsp; {new Date(concert.startsAt).toLocaleString('vi-VN')}
           </p>
           <p style={{ color: '#dc2626', fontWeight: 600, marginTop: '20px', fontSize: '1rem' }}>
             Sự kiện này đã bị hủy bởi Ban tổ chức. Vé của bạn (nếu đã mua) sẽ được hoàn tiền trong thời gian sớm nhất.
@@ -250,7 +250,7 @@ export default function ConcertDetail() {
   if (issuedTickets.length > 0) {
     return (
       <div style={{ maxWidth: '700px', margin: '40px auto', padding: '20px', textAlign: 'center' }}>
-        <h1 style={{ fontSize: '2rem', marginBottom: '10px' }}>🎉 Thanh toán thành công!</h1>
+        <h1 style={{ fontSize: '2rem', marginBottom: '10px' }}>Thanh toán thành công!</h1>
         <p style={{ color: '#4b5563', marginBottom: '24px' }}>Vui lòng xuất trình mã QR dưới đây tại cổng sự kiện.</p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px', justifyContent: 'center' }}>
           {issuedTickets.map((ticket) => (
@@ -271,11 +271,11 @@ export default function ConcertDetail() {
 
       <div style={{ marginTop: '30px', background: 'white', padding: '30px', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
         <h1 style={{ fontSize: '2.5rem', marginBottom: '10px', color: '#000000ff' }}>{concert.title}</h1>
-        <p style={{ fontSize: '1.1rem', color: '#4b5563', marginBottom: '20px', paddingTop: '30px' }}>📍 {concert.venue} &nbsp;|&nbsp; ⏰ {new Date(concert.startsAt).toLocaleString('vi-VN')}</p>
+        <p style={{ fontSize: '1.1rem', color: '#4b5563', marginBottom: '20px', paddingTop: '30px' }}>{concert.venue} &nbsp;|&nbsp; {new Date(concert.startsAt).toLocaleString('vi-VN')}</p>
 
         {Array.isArray(concert.artists) && concert.artists.length > 0 && (
           <p style={{ fontSize: '1.05rem', color: '#111827', fontWeight: 600, marginBottom: '20px' }}>
-            🎤 {concert.artists.join(', ')}
+            {concert.artists.join(', ')}
           </p>
         )}
 
