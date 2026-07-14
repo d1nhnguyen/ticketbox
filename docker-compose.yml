@@ -29,6 +29,116 @@ services:
       timeout: 5s
       retries: 5
 
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: ticketbox_mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+
+  mock-gateway:
+    build:
+      context: ./src/mock-gateway
+    container_name: ticketbox_mock_gateway
+    ports:
+      - "4000:4000"
+    environment:
+      GATEWAY_MODE: success
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:4000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  backend:
+    build:
+      context: ./src/backend
+    container_name: ticketbox_backend
+    ports:
+      - "3000:3000"
+    environment:
+      # Docker values point to service names; optional integrations come from root .env.
+      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/ticketbox?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: supersecret_dev
+      NODE_ENV: "${NODE_ENV:-production}"
+      ENABLE_DEMO_ENDPOINTS: "${ENABLE_DEMO_ENDPOINTS:-false}"
+      TZ: Asia/Ho_Chi_Minh
+      MOCK_PAYMENT_URL: http://mock-gateway:4000
+      VNPAY_ENABLED: "${VNPAY_ENABLED:-false}"
+      VNPAY_URL: "${VNPAY_URL:-}"
+      VNPAY_TMN_CODE: "${VNPAY_TMN_CODE:-}"
+      VNPAY_HASH_SECRET: "${VNPAY_HASH_SECRET:-}"
+      VNPAY_RETURN_URL: "${VNPAY_RETURN_URL:-}"
+      AI_PROVIDER: "${AI_PROVIDER:-anthropic}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      CORS_ALLOWED_ORIGINS: "http://localhost:5173,http://localhost:5174"
+      MAIL_HOST: mailpit
+      MAIL_PORT: "1025"
+      MAIL_SECURE: "false"
+      MAIL_FROM: "TicketBox <no-reply@ticketbox.local>"
+      CSV_INBOX_DIR: /data/inbox
+    volumes:
+      - ./data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mock-gateway:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+
+  web:
+    build:
+      context: ./src/web
+      args:
+        VITE_API_URL: http://localhost:3000
+        VITE_SCANNER_URL: http://localhost:5174
+    container_name: ticketbox_web
+    ports:
+      - "5173:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  scanner:
+    build:
+      context: ./src/scanner
+      args:
+        VITE_API_URL: http://localhost:3000
+    container_name: ticketbox_scanner
+    ports:
+      - "5174:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
 volumes:
   postgres_data:
   redis_data:

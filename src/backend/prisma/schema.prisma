@@ -76,6 +76,7 @@ model Concert {
   startsAt     DateTime
   status       ConcertStatus @default(DRAFT)
   artistBio    String?       @db.Text
+  artists      String[]      @default([])
   bioSourceUrl String?
   seatMapSvg   String?       @db.Text
   createdAt    DateTime      @default(now())
@@ -140,6 +141,7 @@ model Ticket {
   orderId      String
   ticketTypeId String
   qrCode       String       @unique
+  // "one_checkin_per_ticket" partial unique index (raw migration) backstops the VALID→USED flip
   status       TicketStatus @default(VALID)
   checkedInAt  DateTime?
   checkedInBy  String?
@@ -159,7 +161,9 @@ model CheckinLog {
 
   ticket Ticket @relation(fields: [ticketId], references: [id])
 
-  // partial unique (added via raw migration) blocks double check-in — see WEEK1_GUIDE.md Option B
+  // Intentionally NO unique on ticketId — append-only audit log (Option A chosen).
+  // Every scan attempt is recorded, including rejected duplicates, for the 2-device-offline demo.
+  // Double-scan prevention is enforced by the atomic VALID→USED flip in checkin.service.ts.
   @@index([ticketId])
 }
 
@@ -181,7 +185,7 @@ model CsvImportBatch {
   id         String       @id @default(uuid())
   concertId  String
   filename   String
-  checksum   String       @unique
+  checksum   String
   status     ImportStatus @default(PROCESSING)
   rowsTotal  Int
   rowsOk     Int
@@ -189,6 +193,8 @@ model CsvImportBatch {
   createdAt  DateTime     @default(now())
 
   concert Concert @relation(fields: [concertId], references: [id], onDelete: Cascade)
+
+  @@unique([concertId, checksum])
 }
 
 model Notification {
