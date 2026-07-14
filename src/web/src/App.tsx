@@ -17,6 +17,25 @@ import Notifications from './pages/Notifications';
 import VNPayReturn from './pages/VNPayReturn';
 import Register from './pages/Register';
 
+const SCANNER_URL: string = import.meta.env.VITE_SCANNER_URL ?? 'http://localhost:5174';
+
+function ScannerLink() {
+  return (
+    <div style={{ padding: '40px', textAlign: 'center' }}>
+      <h2 style={{ color: '#111827' }}>📱 Ứng dụng Soát vé (Scanner PWA)</h2>
+      <p style={{ color: '#4b5563', marginTop: '10px' }}>
+        Ứng dụng soát vé chạy như một PWA riêng biệt để hỗ trợ chế độ offline.
+      </p>
+      <a
+        href={SCANNER_URL}
+        style={{ display: 'inline-block', marginTop: '20px', padding: '12px 24px', background: '#2563eb', color: 'white', borderRadius: '8px', fontWeight: 700, textDecoration: 'none' }}
+      >
+        Mở ứng dụng Scanner
+      </a>
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <AuthProvider>
@@ -46,13 +65,8 @@ export default function App() {
               <Route path="/admin/csv-upload" element={<CsvUpload />} />
             </Route>
 
-            {/* Task C2a: Scanner Placeholder */}
-            <Route path="/scanner" element={
-              <div style={{ padding: '40px', textAlign: 'center' }}>
-                <h2 style={{ color: '#111827' }}>📱 Ứng dụng Soát vé (Scanner PWA)</h2>
-                <p style={{ color: '#4b5563', marginTop: '10px' }}>Tính năng này đang được phát triển ở Tuần 3.</p>
-              </div>
-            } />
+            {/* Scanner chạy như một PWA riêng — trang này chỉ dẫn sang origin của scanner */}
+            <Route path="/scanner" element={<ScannerLink />} />
 
             <Route path="*" element={<div style={{ padding: '50px', textAlign: 'center', fontSize: '1.5rem', fontWeight: 'bold' }}>404 - Không tìm thấy trang</div>} />
           </Routes>

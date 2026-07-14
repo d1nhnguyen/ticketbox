@@ -1,14 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { QRCodeSVG } from 'qrcode.react';
 
 export default function VNPayReturn() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('Đang xử lý kết quả thanh toán từ VNPay...');
-  const [orderId, setOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     const verifyPayment = async () => {
@@ -20,11 +18,9 @@ export default function VNPayReturn() {
         if (res.data.success) {
           setStatus('success');
           setMessage('Thanh toán thành công!');
-          setOrderId(res.data.data?.orderId);
         } else {
           setStatus('error');
           setMessage(`Thanh toán thất bại: ${res.data.message || 'Lỗi không xác định'}`);
-          setOrderId(res.data.data?.orderId);
 
           // Tự động giải phóng order nếu user hủy/thất bại để nhả vé
           if (res.data.data?.orderId) {

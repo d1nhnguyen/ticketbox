@@ -1,18 +1,30 @@
-import { useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { db } from '../db/db';
+import { getDeviceId } from '../services/session';
+import { syncPendingRecords } from '../services/syncEngine';
 import { CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 
-export default function ScannerTab() {
+interface Props {
+  concertId: string;
+}
+
+interface SyncConflictDetail {
+  ticketId?: string;
+}
+
+export default function ScannerTab({ concertId }: Props) {
   const [scanResult, setScanResult] = useState<{ status: 'IDLE' | 'SUCCESS' | 'ERROR' | 'CONFLICT', message: string }>({ status: 'IDLE', message: '' });
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const resumeTimeoutRef = useRef<number | null>(null);
   const [isScanning, setIsScanning] = useState(false);
 
   useEffect(() => {
     // Listen for sync conflicts
-    const handleConflict = (e: any) => {
-      if (e.detail?.ticketId) {
-        setScanResult({ status: 'CONFLICT', message: `Phát hiện quét trùng trên máy khác! (Vé: ${e.detail.ticketId})` });
+    const handleConflict = (event: Event) => {
+      const { ticketId } = (event as CustomEvent<SyncConflictDetail>).detail ?? {};
+      if (ticketId) {
+        setScanResult({ status: 'CONFLICT', message: `Phát hiện quét trùng trên máy khác! (Vé: ${ticketId})` });
       }
     };
     window.addEventListener('sync-conflict', handleConflict);
@@ -28,7 +40,7 @@ export default function ScannerTab() {
     try {
       // 1. Kiểm tra vé có trong DB hợp lệ không
       const ticket = await db.validTickets.get(decodedText);
-      if (!ticket) {
+      if (!ticket || ticket.concertId !== concertId) {
         setScanResult({ status: 'ERROR', message: 'Mã QR không hợp lệ hoặc không thuộc sự kiện này!' });
         resumeScan();
         return;
@@ -46,12 +58,14 @@ export default function ScannerTab() {
       await db.scanQueue.add({
         clientLogId: crypto.randomUUID(),
         ticketId: ticket.ticketId,
-        deviceId: 'DEVICE_' + Math.floor(Math.random() * 1000), // Có thể lấy từ localStorage
+        deviceId: getDeviceId(), // ID ổn định theo thiết bị, không đổi giữa các lượt quét
         scannedAt: new Date().toISOString(),
         syncStatus: 'PENDING'
       });
 
       setScanResult({ status: 'SUCCESS', message: 'Thành công! (Đã ghi nhận offline)' });
+      // Đang online thì sync ngay, không chờ chu kỳ 10s (có guard chống chồng lượt).
+      void syncPendingRecords();
       resumeScan();
 
     } catch (err) {
@@ -61,14 +75,19 @@ export default function ScannerTab() {
     }
   };
 
-  const resumeScan = () => {
-    setTimeout(() => {
+  const resumeScan = useCallback(() => {
+    if (resumeTimeoutRef.current !== null) {
+      window.clearTimeout(resumeTimeoutRef.current);
+    }
+
+    resumeTimeoutRef.current = window.setTimeout(() => {
+      resumeTimeoutRef.current = null;
       setScanResult({ status: 'IDLE', message: '' });
-      if (scannerRef.current) {
+      if (scannerRef.current?.isScanning) {
         scannerRef.current.resume();
       }
     }, 3000);
-  };
+  }, []);
 
   const startScanner = async () => {
     try {
@@ -88,19 +107,30 @@ export default function ScannerTab() {
     }
   };
 
-  const stopScanner = async () => {
-    if (scannerRef.current && isScanning) {
-      await scannerRef.current.stop();
-      scannerRef.current.clear();
+  const stopScanner = useCallback(async () => {
+    const scanner = scannerRef.current;
+    if (!scanner) return;
+
+    // Clear the ref first so a delayed resume callback cannot restart this instance.
+    scannerRef.current = null;
+    try {
+      if (scanner.isScanning) {
+        await scanner.stop();
+      }
+    } finally {
+      scanner.clear();
       setIsScanning(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     return () => {
-      stopScanner();
+      if (resumeTimeoutRef.current !== null) {
+        window.clearTimeout(resumeTimeoutRef.current);
+      }
+      void stopScanner();
     };
-  }, []);
+  }, [stopScanner]);
 
   return (
     <div style={{ padding: '20px', maxWidth: '500px', margin: '0 auto' }}>

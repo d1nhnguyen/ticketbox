@@ -17,7 +17,7 @@ export default function ConcertDetail() {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
-  const [issuedTickets, setIssuedTickets] = useState<any[]>([]);
+  const [issuedTickets] = useState<any[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<'VNPAY' | 'MOCK'>('VNPAY');
 
   // Hiển thị lỗi từ cổng thanh toán truyền về nếu có và hủy order ngay lập tức để giải phóng vé
