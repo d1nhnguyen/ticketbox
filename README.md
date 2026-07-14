@@ -10,11 +10,11 @@ This README is a step-by-step tutorial for **running the app locally**.
 
 | Tool | Version | Notes |
 | ---- | ------- | ----- |
-| Docker Desktop | 24+ | Runs the complete six-service stack |
+| Docker Desktop | 24+ | Runs the complete seven-service stack |
 | Node.js | 20+ | Optional; only needed for host development or load-test scripts |
 | npm | 9+ | Optional; ships with Node.js |
 
-> Docker Compose runs Postgres, Redis, backend, mock gateway, web, and scanner. No host-side dependency install is required for the standard demo.
+> Docker Compose runs Postgres, Redis, Mailpit, backend, mock gateway, web, and scanner. No host-side dependency install is required for the standard demo.
 
 ---
 
@@ -30,7 +30,8 @@ That's it. On a clean machine this will:
 
 1. Start **Postgres** (`:5432`) and **Redis** (`:6379`) and wait until they're healthy.
 2. Start the **mock payment gateway** (`:4000`).
-3. Start the **backend** (`:3000`), which automatically:
+3. Start the local **Mailpit inbox** (`:8025`) and SMTP server (`:1025`).
+4. Start the **backend** (`:3000`), which automatically:
    - applies Prisma migrations (`prisma migrate deploy`),
    - seeds 4 concerts + 3 test users (idempotent — skips if already seeded),
    - then boots the NestJS API.
@@ -111,12 +112,22 @@ Opens on **http://localhost:5174**.
 | Redis | localhost:6379 | Docker |
 | Web app | http://localhost:5173 | Docker (Nginx static image) |
 | Scanner app | http://localhost:5174 | Docker (Nginx static PWA image) |
+| Mailpit inbox | http://localhost:8025 | Docker |
+| Mailpit SMTP | localhost:1025 | Docker |
 
 Key public API endpoints:
 
 - `GET /concerts` — list concerts
 - `GET /concerts/:slug` — concert detail with ticket types
 - `POST /auth/login` — returns `{ access_token }` (JWT with `{ sub, email, role }`)
+
+### E-ticket email demo
+
+After an audience user completes a mock payment, open **http://localhost:8025**.
+Mailpit captures the message addressed to the user's seeded email account. The
+message contains the buyer, concert, time, ticket type, and one embedded QR image
+per issued ticket. Each QR contains the same value shown in the web dashboard and
+can be scanned by the TicketBox scanner app.
 
 ---
 
