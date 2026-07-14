@@ -30,7 +30,7 @@
 | IM13 | `PARTIAL` | Demo circuit breaker `OPEN → HALF_OPEN → CLOSED`, payment trả fallback phù hợp và concert browsing không bị ảnh hưởng. |
 | IM14 | `PARTIAL` | Chạy duplicate/retry demo với cùng `Idempotency-Key`; chứng minh không tạo order hoặc charge thứ hai. |
 | IM15 | `PARTIAL` | Chạy cache evidence: MISS, HIT, TTL và invalidation sau khi concert/ticket data thay đổi. |
-| IM16 | `PARTIAL` | Rà README, sửa đường dẫn sample CSV, ghi rõ Scanner PWA là mobile implementation, xác nhận account seed/URL demo và thử quick start từ trạng thái sạch. |
+| IM16 | `PARTIAL` | README đã được đối chiếu với Compose, seed, URL, CSV, Scanner PWA và cấu hình tùy chọn; còn chạy quick start từ volume sạch trên môi trường mới để chốt bằng chứng. |
 | IM18 | `PARTIAL` | Chạy toàn bộ hệ thống theo Blueprint từ volume sạch, thực hiện các journey chính và lưu evidence/video. |
 
 ## 2. Thứ tự thực hiện
@@ -95,10 +95,9 @@ Mỗi demo cần lưu output terminal, HTTP/DB assertion hoặc đoạn video ng
 
 ### Bước 6 — README và fresh-start verification
 
-1. Đối chiếu README với Compose, seed accounts, port và URL hiện tại.
-2. Sửa đúng đường dẫn `data/sample-csv/` và tên các file CSV mẫu.
-3. Ghi rõ Scanner PWA là mobile scanner implementation của rubric.
-4. Từ volume sạch, chạy:
+README hiện đã có quick start, 7 service/port, tài khoản seed, đúng đường dẫn dữ liệu mẫu, Scanner PWA, email e-ticket, CSV inbox, AI/VNPay tùy chọn, test kỹ thuật và bảng đối chiếu `BP01–BP15`/`IM01–IM18`.
+
+1. Từ volume sạch trên môi trường kiểm thử mới, chạy:
 
 ```powershell
 docker compose down -v
@@ -106,8 +105,8 @@ docker compose up -d --build
 docker compose ps
 ```
 
-5. Xác nhận cả 7 service healthy và seed có đủ 4 concert.
-6. Chạy lại các journey:
+2. Xác nhận cả 7 service healthy và seed có đủ 4 concert.
+3. Chạy lại các journey:
    - audience mua vé → QR → in-app notification → email;
    - organizer CRUD/stats/CSV/AI;
    - scanner offline → reconnect → sync.

@@ -1,337 +1,399 @@
 # TicketBox
 
-A concert ticketing platform — NestJS + Prisma + PostgreSQL + Redis backend, React (Vite) web & scanner apps, and a mock payment gateway.
+TicketBox là hệ thống bán và soát vé concert gồm web cho khán giả/ban tổ chức, Scanner PWA offline-first, NestJS API, PostgreSQL, Redis/BullMQ, cổng thanh toán mock hoặc VNPay sandbox, Mailpit và chức năng AI Artist Bio.
 
-This README is a step-by-step tutorial for **running the app locally**.
+README này là hướng dẫn tự đủ để người chấm clone, khởi chạy và demo toàn bộ hệ thống. Tài liệu kiến trúc nằm trong [`blueprint/`](blueprint/), kế hoạch kiểm thử chi tiết nằm tại [`docs/TEST_PLAN.md`](docs/TEST_PLAN.md).
 
----
+## 1. Yêu cầu môi trường
 
-## 1. Prerequisites
+### Bắt buộc
 
-| Tool | Version | Notes |
-| ---- | ------- | ----- |
-| Docker Desktop | 24+ | Runs the complete seven-service stack |
-| Node.js | 20+ | Optional; only needed for host development or load-test scripts |
-| npm | 9+ | Optional; ships with Node.js |
+- Docker Desktop 24+ (có Docker Compose v2).
+- Git.
+- Khoảng 4 GB dung lượng trống cho image và volume.
 
-> Docker Compose runs Postgres, Redis, Mailpit, backend, mock gateway, web, and scanner. No host-side dependency install is required for the standard demo.
+### Tùy chọn
 
----
+- Node.js 20+ và npm 9+ để chạy test/build ngoài Docker.
+- [k6](https://grafana.com/docs/k6/latest/set-up/install-k6/) để chạy các bài kiểm tra concurrency và rate limiting.
+- API key Anthropic, Gemini hoặc OpenAI nếu muốn demo AI bằng provider thật. Không có key, hệ thống vẫn chạy và dùng fallback an toàn.
 
-## 2. Quick start (the complete stack)
+## 2. Khởi chạy nhanh bằng Docker
 
-From the repo root:
+Từ thư mục gốc của repository:
 
-```bash
+```powershell
+git clone <repository-url>
+cd ticketbox
 docker compose up -d --build
+docker compose ps
 ```
 
-That's it. On a clean machine this will:
+Lần chạy đầu, backend tự động:
 
-1. Start **Postgres** (`:5432`) and **Redis** (`:6379`) and wait until they're healthy.
-2. Start the **mock payment gateway** (`:4000`).
-3. Start the local **Mailpit inbox** (`:8025`) and SMTP server (`:1025`).
-4. Start the **backend** (`:3000`), which automatically:
-   - applies Prisma migrations (`prisma migrate deploy`),
-   - seeds 4 concerts + 3 test users (idempotent — skips if already seeded),
-   - then boots the NestJS API.
+1. chờ PostgreSQL, Redis, Mailpit và mock gateway sẵn sàng;
+2. chạy Prisma migration;
+3. seed idempotent 4 concert, ticket type, artist, SVG seat map và 3 tài khoản mẫu;
+4. khởi động API và BullMQ worker.
 
-The command also builds production images for the web app (`:5173`) and scanner PWA (`:5174`). Compose health checks gate startup of dependent services.
+Kiểm tra nhanh:
 
-Verify the stack:
-
-```bash
-curl http://localhost:3000/concerts
-curl http://localhost:3000/health
-curl http://localhost:4000/health
+```powershell
+Invoke-RestMethod http://localhost:3000/health
+(Invoke-RestMethod http://localhost:3000/concerts).Count
+docker compose ps
 ```
 
-You should get a JSON array of **4 concerts**. 🎉
+Kết quả mong đợi: health trả trạng thái hoạt động, concert count bằng `4`, và cả 7 service đều healthy/running.
 
-### Watch the logs
+Nếu cần xem log:
 
-```bash
+```powershell
 docker compose logs -f backend
 ```
 
-Look for `🌱 Seeding…`, `✅ Seed completed.`, and `Nest application successfully started`.
+> Mock payment là luồng demo mặc định, không cần tài khoản hay secret bên ngoài.
 
----
+## 3. URL và tài khoản seed
 
-## 3. Seeded login accounts
+| Thành phần | Địa chỉ |
+|---|---|
+| Web khán giả và ban tổ chức | <http://localhost:5173> |
+| Scanner PWA | <http://localhost:5174> |
+| Backend API | <http://localhost:3000> |
+| Mock payment gateway | <http://localhost:4000> |
+| Mailpit xem email | <http://localhost:8025> |
+| PostgreSQL | `localhost:5432` |
+| Redis | `localhost:6379` |
 
-The seed creates one user per role. Use these to log in via the web app:
+| Vai trò | Email | Mật khẩu | Nơi sử dụng |
+|---|---|---|---|
+| Khán giả (`AUDIENCE`) | `audience@ticketbox.dev` | `password123` | Web |
+| Ban tổ chức (`ORGANIZER`) | `organizer@ticketbox.dev` | `password123` | Web/Admin |
+| Nhân viên soát vé (`SCANNER`) | `scanner@ticketbox.dev` | `password123` | Scanner PWA |
 
-| Role | Email | Password |
-| ---- | ----- | -------- |
-| Audience | `audience@ticketbox.dev` | `password123` |
-| Organizer | `organizer@ticketbox.dev` | `password123` |
-| Scanner | `scanner@ticketbox.dev` | `password123` |
+RBAC được kiểm tra tại API bằng JWT/guard, tại route admin của web và tại Scanner PWA. Đăng nhập sai vai trò phải bị từ chối, không chỉ ẩn nút trên giao diện.
 
----
+## 4. Kiến trúc runtime và ảnh hưởng khi lỗi
 
-## 4. Frontends
+| Thành phần | Vai trò | Giao tiếp chính | Khi thành phần lỗi |
+|---|---|---|---|
+| Web | xem concert, mua vé, quản trị | HTTPS/JSON tới backend | Scanner và API vẫn độc lập; không mất dữ liệu |
+| Scanner PWA | tải dữ liệu, quét QR, lưu scan offline | HTTPS khi online, IndexedDB khi offline | tiếp tục check-in từ dữ liệu đã tải; đồng bộ lại khi có mạng |
+| Backend NestJS | auth, concert, order, ticket, admin, CSV, AI | Prisma, Redis, SMTP, payment HTTP | trả lỗi có kiểm soát; transaction bảo vệ dữ liệu |
+| PostgreSQL | nguồn dữ liệu chuẩn | Prisma/SQL transaction | thao tác ghi dừng; không xác nhận thanh toán/check-in giả |
+| Redis + BullMQ | cache và hàng đợi notification/CSV | Redis protocol | dữ liệu gốc vẫn ở PostgreSQL; tác vụ nền có thể retry sau |
+| Mock/VNPay sandbox | thanh toán | redirect và callback có chữ ký | circuit breaker mở, payment trả `503`; duyệt concert vẫn hoạt động |
+| Mailpit | SMTP và giao diện email local | SMTP `1025`, UI `8025` | order/ticket vẫn được tạo; lỗi gửi được log và job retry |
 
-The default Compose stack serves the web app at **http://localhost:5173** and the scanner PWA at **http://localhost:5174**. For optional host development with hot reload, stop the corresponding Compose service and use the commands below.
+Chi tiết C4 Level 1, C4 Level 2, data model, failure isolation và ADR: [`blueprint/design.md`](blueprint/design.md). Phạm vi và actor: [`blueprint/proposal.md`](blueprint/proposal.md).
 
-### Web app (audience + organizer)
+## 5. Các luồng demo chính
 
-```bash
-cd src/web
-npm ci
-npm run dev
+### 5.1 Khán giả mua vé và nhận e-ticket
+
+1. Mở <http://localhost:5173>, đăng nhập tài khoản Audience.
+2. Mở một concert, bấm trực tiếp khu trên SVG hoặc dùng nút `+/-` để chọn loại/số lượng vé.
+3. Chọn Mock Payment và xác nhận thanh toán thành công.
+4. Sau redirect, mở **Vé của tôi** để xem đầy đủ e-ticket và QR riêng của từng vé.
+5. Mở **Thông báo** để xem thông báo trong app.
+6. Mở Mailpit tại <http://localhost:8025>. Email gửi tới `audience@ticketbox.dev` hiển thị người mua, concert, ticket type và QR của từng ticket.
+
+Luồng backend giữ stock trong transaction có row lock, enforce `maxPerUser` trên tổng `PENDING + PAID`, dùng idempotency để không tạo/charge hai lần, hoàn kho order hết hạn và invalidate cache liên quan. Xem [`blueprint/specs/purchase.md`](blueprint/specs/purchase.md), [`blueprint/specs/payment.md`](blueprint/specs/payment.md) và [`blueprint/specs/notifications.md`](blueprint/specs/notifications.md).
+
+### 5.2 Ban tổ chức
+
+1. Đăng nhập tài khoản Organizer; hệ thống chuyển tới `/admin`.
+2. Tạo/sửa/hủy concert và cấu hình ticket type.
+3. Mở chi tiết concert để xem lượng bán và doanh thu từ order `PAID`.
+4. Upload Guest List CSV hoặc upload PDF để tạo Artist Bio.
+
+Dữ liệu mẫu:
+
+- CSV: [`data/sample-csv/guests-valid.csv`](data/sample-csv/guests-valid.csv), [`guests-duplicates.csv`](data/sample-csv/guests-duplicates.csv), [`guests-with-errors.csv`](data/sample-csv/guests-with-errors.csv).
+- PDF: [`data/sample-pdf/sample-pdf.pdf`](data/sample-pdf/sample-pdf.pdf).
+
+### 5.3 Scanner PWA và offline check-in
+
+Scanner PWA tại <http://localhost:5174> là phần cài đặt mobile scanner của rubric; có thể cài như PWA hoặc demo bằng mobile viewport.
+
+1. Đăng nhập bằng tài khoản Scanner.
+2. Chọn concert và tải ticket/guest list trước khi mất mạng.
+3. Trong DevTools chọn Network → Offline rồi reload trang.
+4. Quét QR e-ticket. Scan được ghi vào IndexedDB và hiển thị pending.
+5. Quét lại cùng QR trên thiết bị đó; local duplicate guard phải chặn.
+6. Bật mạng lại; queue tự đồng bộ với backend và không mất scan sau reload.
+7. Để demo xung đột, dùng hai browser profile quét cùng một vé khi offline. Khi đồng bộ, server chỉ chấp nhận một scan; scan còn lại nhận kết quả duplicate.
+
+Giới hạn có chủ đích: hai thiết bị cùng offline không thể biết trạng thái của nhau theo thời gian thực. Unique constraint và transaction phía server giải quyết xung đột khi sync. Xem [`blueprint/specs/checkin.md`](blueprint/specs/checkin.md).
+
+### 5.4 Scheduled Guest List CSV
+
+Ngoài upload thủ công, backend poll thư mục inbox mỗi 10 giây. Tên file phải theo mẫu:
+
+```text
+<concert-slug>__<mô-tả-bất-kỳ>.csv
 ```
 
-Opens on **http://localhost:5173**. It talks to the backend at `http://localhost:3000`.
+Ví dụ PowerShell từ thư mục gốc:
 
-- Browse concerts at `/`
-- Log in at `/login` (use the accounts above)
-- Organizer logins land on `/admin`
-
-### Scanner app
-
-Run it on a different port so it doesn't collide with the web app:
-
-```bash
-cd src/scanner
-npm ci
-npm run dev -- --port 5174
+```powershell
+Copy-Item data/sample-csv/guests-valid.csv data/inbox/anh-trai-say-hi__demo.csv
+Start-Sleep -Seconds 15
+Get-ChildItem data/inbox/processed
+Get-ChildItem data/inbox/failed
 ```
 
-Opens on **http://localhost:5174**.
+File thành công hoặc checksum đã xử lý được chuyển vào `data/inbox/processed/`; sai slug, sai extension hoặc batch thất bại được chuyển vào `data/inbox/failed/`. Row lỗi được cô lập, checksum chống nhập trùng và lỗi file không làm dừng backend. Xem [`blueprint/specs/csv-ingestion.md`](blueprint/specs/csv-ingestion.md).
 
----
+### 5.5 Nhắc trước concert 24 giờ
 
-## 5. Service map & ports
+Reminder cron tạo notification và gửi email cho người có vé `PAID` khi concert đi vào cửa sổ khoảng 24 giờ. Để demo nhanh bằng debug trigger, bật endpoint demo theo mục 7, điều chỉnh concert vào cửa sổ reminder rồi gọi:
 
-| Service | URL / Port | Runs in |
-| ------- | ---------- | ------- |
-| Backend API | http://localhost:3000 | Docker |
-| Mock payment gateway | http://localhost:4000 | Docker |
-| Postgres | localhost:5432 | Docker |
-| Redis | localhost:6379 | Docker |
-| Web app | http://localhost:5173 | Docker (Nginx static image) |
-| Scanner app | http://localhost:5174 | Docker (Nginx static PWA image) |
-| Mailpit inbox | http://localhost:8025 | Docker |
-| Mailpit SMTP | localhost:1025 | Docker |
-
-Key public API endpoints:
-
-- `GET /concerts` — list concerts
-- `GET /concerts/:slug` — concert detail with ticket types
-- `POST /auth/login` — returns `{ access_token }` (JWT with `{ sub, email, role }`)
-
-### E-ticket email demo
-
-After an audience user completes a mock payment, open **http://localhost:8025**.
-Mailpit captures the message addressed to the user's seeded email account. The
-message contains the buyer, concert, time, ticket type, and one embedded QR image
-per issued ticket. Each QR contains the same value shown in the web dashboard and
-can be scanned by the TicketBox scanner app.
-
----
-
-## 6. Mock payment gateway
-
-Mock payment is the default, fully working demo path. The browser opens the mock checkout page; successful confirmation returns to the web app, while the backend owns the `PENDING → PAID` transition, charge idempotency, and QR ticket issuance.
-
-The gateway can simulate three outcomes, switchable live (used to demo the circuit breaker):
-
-```bash
-# Flip the mode at runtime
-curl -X POST http://localhost:4000/admin/mode \
-  -H "Content-Type: application/json" \
-  -d '{"mode":"failure"}'   # "success" | "timeout" | "failure"
+```powershell
+Invoke-RestMethod -Method Post http://localhost:3000/debug/reminders/trigger
 ```
 
-The default mode is set by `GATEWAY_MODE` in [docker-compose.yml](docker-compose.yml).
+Kiểm tra thông báo trong web, email trong Mailpit và log backend. Channel notification tách riêng để có thể bổ sung SMS/Zalo mà không đổi purchase flow.
 
-### Optional VNPay sandbox
+## 6. Cấu hình tùy chọn
 
-VNPay is disabled by default. To enable it, set the complete backend configuration and rebuild:
+Docker Compose tự đọc file `.env` ở thư mục gốc. File này đã được gitignore; không commit secret thật.
+
+### 6.1 VNPay sandbox
+
+Mock payment luôn sẵn sàng. Để hiện thêm lựa chọn VNPay sandbox, thêm đủ các biến sau vào `.env`:
 
 ```env
 VNPAY_ENABLED=true
 VNPAY_URL=https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
-VNPAY_TMN_CODE=your_merchant_code
-VNPAY_HASH_SECRET=your_hash_secret
+VNPAY_TMN_CODE=<sandbox-merchant-code>
+VNPAY_HASH_SECRET=<sandbox-hash-secret>
 VNPAY_RETURN_URL=http://localhost:5173/vnpay-return
 ```
 
-The backend refuses to start if VNPay is enabled with missing values. The web UI reads `GET /payment/methods`, so VNPay controls remain hidden until the backend reports a complete configuration. MoMo and production payment processing are out of scope.
-
-### CORS
-
-The backend only accepts cross-origin requests from the origins listed in `CORS_ALLOWED_ORIGINS` (comma-separated). It defaults to `http://localhost:5173,http://localhost:5174` (the web and scanner dev/Docker origins) — update it if you serve either frontend from a different host.
-
-### Demo/debug endpoints
-
-`POST /payment/charge`, `POST /payment/reset`, and `POST /debug/reminders/trigger` are demo-only surfaces used by the load-test scripts, not part of the real purchase flow (the real flow calls the payment gateway in-process). They are disabled by default and always disabled when `NODE_ENV=production` (as in the Docker profile). To run them locally, set both in `src/backend/.env`:
-
-```env
-ENABLE_DEMO_ENDPOINTS=true
-NODE_ENV=development
-```
-
-To run `scripts/load-test/circuit-breaker.js` or `scripts/load-test/test-reminder-cron.js` against the Docker stack, temporarily override the flag:
-
-```bash
-docker compose run -e ENABLE_DEMO_ENDPOINTS=true --rm backend
-```
-
----
-
-## 7. Common tasks
-
-```bash
-# Stop everything (keeps the database volume)
-docker compose down
-
-# Stop AND wipe the database (fresh seed on next up)
-docker compose down -v
-
-# Rebuild after backend code changes
-docker compose up -d --build backend
-
-# Force a fresh re-seed without wiping the volume
-docker compose run --rm -e FORCE_SEED=1 --entrypoint sh backend \
-  -c "npx prisma migrate deploy && npx ts-node --transpile-only prisma/seed.ts"
-```
-
----
-
-## 8. Load testing — oversell prevention
-
-The purchase flow guards against overselling under concurrency (atomic conditional
-decrement inside a row-locked transaction). [scripts/load-test/oversell.js](scripts/load-test/oversell.js)
-proves it: it fires **100 concurrent** purchase requests at the `anh-trai-say-hi`
-SVIP tier, which is seeded with only **50** tickets, and asserts that **exactly 50**
-succeed, 50 get `409 Sold Out`, and stock never goes negative.
-
-### Step 1 — reset the stock (required)
-
-The test only means something when SVIP stock starts at its full **50**. Re-seeding
-resets it, **but plain `npm run seed` is a no-op once the DB already has data** — the
-seed has an idempotency guard. You must force it with `FORCE_SEED=1`:
-
-```bash
-# Backend running in Docker:
-docker compose run --rm -e FORCE_SEED=1 --entrypoint sh backend \
-  -c "npx prisma migrate deploy && npx ts-node --transpile-only prisma/seed.ts"
-
-# Backend running on host (from src/backend):
-FORCE_SEED=1 npm run seed
-```
+Áp dụng cấu hình:
 
 ```powershell
-# PowerShell (from src/backend):
-$env:FORCE_SEED="1"; npm run seed
+docker compose up -d --force-recreate backend
 ```
 
-> ⚠️ `FORCE_SEED=1` **wipes all orders/tickets** and re-creates the demo data.
+Backend sinh request bằng giờ Việt Nam, kiểm tra chữ ký, amount, order reference, response code và currency khi callback có gửi trường currency. Đây chỉ là sandbox phục vụ đồ án; không phải tích hợp production. Không đưa `VNPAY_HASH_SECRET` vào source, ảnh chụp hoặc video.
 
-### Step 2 — run the test
+### 6.2 AI Artist Bio bằng provider thật
 
-```bash
-node scripts/load-test/oversell.js
+Chọn một provider trong `.env`:
+
+```env
+AI_PROVIDER=gemini
+GEMINI_API_KEY=<api-key>
 ```
 
-A genuine pass looks like this:
+Hoặc dùng `AI_PROVIDER=anthropic` + `ANTHROPIC_API_KEY`, hay `AI_PROVIDER=openai` + `OPENAI_API_KEY`. Sau đó:
 
-```
-✅ Found SVIP ticket type: ... totalQty = 50, remainingQty = 50
-  ✅ 201 Created (Success) : 50
-  ⛔ 409 Conflict (Sold Out): 50
-  Remaining stock : 0
-🎉 OVERSELL PREVENTION TEST PASSED!
+```powershell
+docker compose up -d --force-recreate backend
 ```
 
-If you instead see it start from `remainingQty = 0` and pass with `0` sold, that's a
-**false pass** — the stock wasn't reset. Re-run Step 1 with `FORCE_SEED=1`.
+Đăng nhập Organizer, upload [`data/sample-pdf/sample-pdf.pdf`](data/sample-pdf/sample-pdf.pdf), kiểm tra text được tách/làm sạch và bio được lưu. Khi provider timeout/lỗi/không có key, backend dùng fallback có kiểm soát và không làm hỏng concert. Xem [`blueprint/specs/ai-bio.md`](blueprint/specs/ai-bio.md).
 
-### 8.1 Other Load Tests
-You can run the following test scripts similarly:
-- **Rate Limit**: `node scripts/load-test/rate-limit.js`
-- **Circuit Breaker**: `node scripts/load-test/circuit-breaker.js`
-- **Per-User Limit**: `node scripts/load-test/per-user-limit.js`
+### 6.3 CORS
 
----
+Mặc định backend chấp nhận `http://localhost:5173` và `http://localhost:5174`. Nếu đổi origin frontend, cập nhật `CORS_ALLOWED_ORIGINS` trong [`docker-compose.yml`](docker-compose.yml).
 
-## 9. AI Artist Bio Setup
+## 7. Demo cơ chế kỹ thuật
 
-To enable the AI Artist Bio feature:
-1. Open `src/backend/.env`.
-2. Set `AI_PROVIDER=gemini` (or `anthropic`, `openai`).
-3. Set the corresponding API key, e.g., `GEMINI_API_KEY=your_key_here`.
-4. If no key is set or the feature fails, the system safely falls back to a placeholder bio.
+Ba endpoint `/payment/charge`, `/payment/reset` và `/debug/reminders/trigger` chỉ phục vụ demo/test, mặc định bị tắt và luôn bị tắt khi `NODE_ENV=production`.
 
----
+Để bật tạm thời, thêm vào `.env` gốc:
 
-## 10. CSV Import Demo
-
-To test the VIP Guest CSV upload:
-1. Log in as **Organizer** (`organizer@ticketbox.dev`).
-2. Go to the Admin Dashboard and select a Concert.
-3. In the "Upload Khách mời (CSV)" tab, use the sample files in `src/backend/data/sample-csv/`:
-   - `valid-guests.csv`: Imports successfully.
-   - `duplicate-guests.csv`: Tests the checksum and duplicate rejection.
-   - `invalid-format.csv`: Tests validation errors.
-
----
-
-## 11. Offline Check-in Demo
-
-To test the PWA Scanner's offline capability:
-1. Open the Scanner app (`http://localhost:5174`) and log in as **Scanner**.
-2. Go to the "Tải dữ liệu" tab and sync the latest tickets for a concert.
-3. **Turn off your network** (in DevTools -> Network -> Offline).
-4. Scan a ticket QR code (or use the VIP Search tab). The check-in will be recorded locally in IndexedDB.
-5. Try scanning the same ticket again — you'll be blocked (Local Double-scan block).
-6. **Turn the network back on**. The app will automatically sync the offline logs to the Backend.
-
----
-
-## 12. Running the backend without Docker (optional)
-
-If you prefer to run the API on your host (you still need Postgres + Redis from Docker):
-
-```bash
-docker compose up -d postgres redis mock-gateway   # infra only
-cd src/backend
-npm install
-npx prisma migrate deploy
-npm run seed
-npm run start:dev
+```env
+NODE_ENV=development
+ENABLE_DEMO_ENDPOINTS=true
 ```
 
-The host `.env` already points `DATABASE_URL` / `REDIS_URL` at `localhost`.
+Sau đó recreate backend:
 
----
+```powershell
+docker compose up -d --force-recreate backend
+```
+
+Khi demo xong, đổi lại `NODE_ENV=production`, `ENABLE_DEMO_ENDPOINTS=false` và recreate backend.
+
+### 7.1 Chuẩn bị lại dữ liệu stock
+
+Các test oversell/per-user tiêu thụ stock. Lệnh sau xóa order/ticket hiện tại và tạo lại dữ liệu demo:
+
+```powershell
+docker compose run --rm -e FORCE_SEED=1 --entrypoint sh backend -c "npx prisma migrate deploy && npx ts-node --transpile-only prisma/seed.ts"
+```
+
+> Cảnh báo: `FORCE_SEED=1` xóa dữ liệu giao dịch demo hiện có.
+
+### 7.2 Concurrency, rate limit và circuit breaker
+
+Từ thư mục gốc:
+
+```powershell
+k6 run scripts/load-test/oversell.js
+k6 run scripts/load-test/per-user-limit.js
+k6 run scripts/load-test/rate-limit.js
+node scripts/load-test/circuit-breaker.js
+```
+
+- `oversell.js`: 100 buyer tranh 50 vé, stock không âm và số thành công không vượt stock.
+- `per-user-limit.js`: một account gửi request đồng thời nhưng tổng vé không vượt `maxPerUser`.
+- `rate-limit.js`: burst có `429`, traffic chậm hợp lệ vẫn đi qua.
+- `circuit-breaker.js`: mô phỏng gateway lỗi và chứng minh `CLOSED → OPEN → HALF_OPEN → CLOSED`; concert browsing vẫn hoạt động.
+
+Chi tiết threshold và kết quả mong đợi: [`scripts/load-test/README.md`](scripts/load-test/README.md).
+
+### 7.3 Idempotency và cache
+
+- Gửi lại cùng purchase/payment request với cùng `Idempotency-Key`: backend trả lại kết quả cũ, không tạo order hoặc charge thứ hai.
+- Concert list/detail được cache Redis với TTL. Admin update/cancel concert hoặc thay đổi ticket data sẽ invalidate key liên quan; availability cuối cùng vẫn được bảo vệ bởi PostgreSQL transaction, không lấy cache làm nguồn đúng tuyệt đối.
+
+Kịch bản và assertion cụ thể nằm trong [`docs/TEST_PLAN.md`](docs/TEST_PLAN.md), mục `BUY-06`, `TECH-07`.
+
+## 8. Test và build
+
+### Backend
+
+```powershell
+Set-Location src/backend
+npm ci
+npm test -- --runInBand
+npm run build
+Set-Location ../..
+```
+
+### Web
+
+```powershell
+Set-Location src/web
+npm ci
+npm run build
+Set-Location ../..
+```
+
+### Scanner
+
+```powershell
+Set-Location src/scanner
+npm ci
+npm run build
+Set-Location ../..
+```
+
+Kiểm tra Compose không sai cú pháp:
+
+```powershell
+docker compose config --quiet
+```
+
+## 9. Quản lý dữ liệu và vòng đời Docker
+
+```powershell
+# Dừng stack, giữ database
+docker compose down
+
+# Rebuild backend sau khi đổi source
+docker compose up -d --build backend
+
+# Rebuild toàn bộ
+docker compose up -d --build
+```
+
+Chỉ dùng lệnh sau khi muốn xóa toàn bộ database và kiểm tra fresh start:
+
+```powershell
+docker compose down -v
+docker compose up -d --build
+```
+
+Seed nằm trong [`data/seed/`](data/seed/) và được mount read-only vào backend. Inbox CSV được bind mount từ [`data/inbox/`](data/inbox/).
+
+## 10. Đối chiếu rubric Blueprint
+
+| Mã | Bằng chứng trong repository |
+|---|---|
+| BP01 | Tổng thể, giao tiếp và failure isolation trong [`blueprint/design.md`](blueprint/design.md) |
+| BP02 | C4 Level 1 – System Context trong `design.md` |
+| BP03 | C4 Level 2 – Container trong `design.md` |
+| BP04 | High-level/runtime architecture trong `design.md`, gồm payment, AI/PDF, CSV và offline scanner |
+| BP05 | ERD, quyết định PostgreSQL/Redis và schema tại [`src/backend/prisma/schema.prisma`](src/backend/prisma/schema.prisma) |
+| BP06 | Luồng purchase/payment/notification trong [`blueprint/specs/purchase.md`](blueprint/specs/purchase.md) |
+| BP07 | Luồng offline check-in, conflict và sync trong [`blueprint/specs/checkin.md`](blueprint/specs/checkin.md) |
+| BP08 | Luồng upload/scheduled CSV, row lỗi và dedup trong [`blueprint/specs/csv-ingestion.md`](blueprint/specs/csv-ingestion.md) |
+| BP09 | RBAC trong [`blueprint/specs/auth.md`](blueprint/specs/auth.md) và `design.md` |
+| BP10 | Rate limiting, tải đột biến và fairness trong `design.md`/purchase spec |
+| BP11 | Circuit breaker và graceful degradation trong [`blueprint/specs/payment.md`](blueprint/specs/payment.md) |
+| BP12 | Idempotency key trong payment/purchase specs |
+| BP13 | Cache TTL và invalidation trong `design.md` |
+| BP14 | ADR và đánh đổi trong `design.md` cùng các specs |
+| BP15 | [`blueprint/proposal.md`](blueprint/proposal.md), [`blueprint/design.md`](blueprint/design.md), [`blueprint/specs/`](blueprint/specs/) |
+
+## 11. Đối chiếu rubric cài đặt
+
+| Mã | Cách kiểm tra nhanh |
+|---|---|
+| IM01 | Web list/detail hiển thị artist, venue, SVG zone và vé còn lại |
+| IM02 | Audience mua vé, mock/VNPay sandbox callback và QR e-ticket |
+| IM03 | `k6 run scripts/load-test/per-user-limit.js` |
+| IM04 | Purchase notification/email trong Mailpit và reminder mục 5.5 |
+| IM05 | Organizer CRUD/cancel, ticket type và paid revenue/sold stats |
+| IM06 | Role matrix API, web admin và Scanner PWA |
+| IM07 | Scanner PWA quét và xác nhận QR tại cổng |
+| IM08 | Offline/reload/reconnect/two-profile demo mục 5.3 |
+| IM09 | Upload PDF, extract/clean và gọi provider/fallback |
+| IM10 | Upload CSV và scheduled inbox mục 5.4 |
+| IM11 | `k6 run scripts/load-test/oversell.js` |
+| IM12 | `k6 run scripts/load-test/rate-limit.js` |
+| IM13 | `node scripts/load-test/circuit-breaker.js` |
+| IM14 | Retry cùng `Idempotency-Key`, đối chiếu một order/charge |
+| IM15 | Cache MISS/HIT/TTL/invalidation theo `TECH-07` trong test plan |
+| IM16 | Quick start, tài khoản, URL, dữ liệu mẫu và troubleshooting trong README này |
+| IM17 | 4 concert mẫu, ticket type, artist và SVG tại [`data/seed/`](data/seed/) |
+| IM18 | Fresh start rồi chạy ba journey Audience, Organizer, Scanner |
+
+## 12. Cấu trúc repository
+
+```text
+ticketbox/
+├── blueprint/
+│   ├── proposal.md
+│   ├── design.md
+│   └── specs/
+├── data/
+│   ├── seed/
+│   ├── sample-csv/
+│   ├── sample-pdf/
+│   └── inbox/
+├── docs/
+│   ├── COMPLETION_PLAN.md
+│   └── TEST_PLAN.md
+├── scripts/load-test/
+├── src/
+│   ├── backend/
+│   ├── mock-gateway/
+│   ├── scanner/
+│   └── web/
+├── docker-compose.yml
+└── README.md
+```
 
 ## 13. Troubleshooting
 
-| Symptom | Fix |
-| ------- | --- |
-| `GET /concerts` returns `[]` | Seed didn't run on a populated DB. Wipe and restart: `docker compose down -v && docker compose up -d --build`. |
-| Backend exits with `Cannot find module dist/main.js` | Rebuild the image: `docker compose up -d --build backend`. |
-| Web app shows "Không thể kết nối đến Backend" | Backend isn't up. Check `docker compose ps` and `docker compose logs backend`. |
-| Port already in use (5432/6379/3000/4000) | Stop the conflicting local service, or change the host port mapping in `docker-compose.yml`. |
-| Scanner won't start (port 5173 busy) | Run it on another port: `npm run dev -- --port 5174`. |
+| Hiện tượng | Cách xử lý |
+|---|---|
+| Backend/web chưa healthy | `docker compose ps`, sau đó `docker compose logs backend` hoặc service tương ứng |
+| `GET /concerts` không có 4 concert | Fresh reset bằng `docker compose down -v`, rồi `docker compose up -d --build` |
+| Web không gọi được API | Kiểm tra backend `:3000` và `CORS_ALLOWED_ORIGINS` |
+| Không thấy email | Kiểm tra Mailpit `:8025`, `docker compose logs backend` và Redis/BullMQ |
+| CSV chưa được xử lý | Đợi ít nhất 15 giây; kiểm tra đúng mẫu tên, `processed/`, `failed/` và log backend |
+| VNPay báo giao dịch hết hạn | Đồng bộ giờ hệ điều hành, recreate backend và tạo order mới; không dùng lại URL thanh toán cũ |
+| VNPay callback thất bại | Kiểm tra đúng cặp TMN code/hash secret sandbox và return URL; không tự sửa query đã ký |
+| Scanner không quét camera | Cấp quyền camera; trên thiết bị khác cần HTTPS, hoặc demo ở `localhost`/mobile viewport |
+| Port đã được dùng | Dừng dịch vụ đang chiếm `3000`, `4000`, `5173`, `5174`, `5432`, `6379` hoặc `8025` |
 
----
-
-## 14. Project layout
-
-```
-ticketbox/
-├─ docker-compose.yml        # complete six-service stack
-├─ data/seed/                # seed data (concerts.json, users.json)
-├─ src/
-│  ├─ backend/               # NestJS API (Prisma, auth, concerts, payment)
-│  │  └─ docker-entrypoint.sh  # migrate → seed → start
-│  ├─ mock-gateway/          # Express mock payment gateway
-│  ├─ web/                   # React (Vite) audience + organizer app
-│  └─ scanner/               # React (Vite) scanner app
-├─ blueprint/                # design docs + specs
-└─ docs/                     # WEEK1_GUIDE.md, WEEK1_MISSING_TASKS.md
-```
+Trước khi quay video/nộp bài, chạy toàn bộ checklist trong [`docs/TEST_PLAN.md`](docs/TEST_PLAN.md) và xem các việc còn mở tại [`docs/COMPLETION_PLAN.md`](docs/COMPLETION_PLAN.md).
