@@ -484,6 +484,16 @@ Khóa dòng loại vé, đếm đơn `PAID` và `PENDING` còn hạn của user,
 
 Token bucket dùng Lua/Redis để việc refill–consume nguyên tử và chia sẻ trạng thái giữa instance. Fixed window không được chọn vì có thể cho burst gấp đôi quanh ranh giới; sliding log tốn bộ nhớ theo request. Khóa có thể theo IP hoặc user; login/register/payment/order có cấu hình riêng.
 
+| Nhóm endpoint | Capacity/refill hiện tại | Key | Khi vượt ngưỡng |
+|---|---:|---|---|
+| Public API mặc định | 100 burst, 10 token/giây | IP | `429`, `Retry-After`, remaining/reset headers |
+| `POST /auth/register` | 10 burst, 1 token/giây | IP | `429`; giảm spam tạo tài khoản |
+| `POST /auth/login` | 5 burst, 0,5 token/giây | IP | `429`; làm chậm brute force |
+| Payment charge demo | 20 burst, 2 token/giây | IP | `429`; không gọi gateway |
+| `POST /orders` | 150 burst, 10 token/giây | User ID từ JWT | `429`; không vào transaction/row lock |
+
+Bucket key nằm trong Redis nên nhiều backend instance nhìn cùng trạng thái. Lua thực hiện refill, kiểm tra và trừ token trong một thao tác atomic; bucket không hoạt động sẽ hết hạn sau khoảng hai lần thời gian refill đầy. Endpoint health/demo cần quan sát có thể chủ động `@SkipRateLimit`, không được áp dụng tùy tiện cho purchase.
+
 Ngưỡng hiện tại là cấu hình bảo vệ demo, không phải bằng chứng hệ thống production chịu đủ 933 người dùng/giây. Load test phải đo throughput backend/DB rồi đặt tổng admission budget thấp hơn capacity an toàn. Rate limit chỉ giảm spam; fairness cho sale hot còn cần waiting room/admission token và bot challenge. Redis lỗi hiện làm guard thất bại theo hướng fail-closed, tránh nhận purchase khi không kiểm soát được tải.
 
 ### 6.3. Circuit Breaker
@@ -502,6 +512,15 @@ Mục tiêu là tác dụng nghiệp vụ effectively-once trên nền delivery 
 ### 6.5. Cache-aside
 
 Danh sách concert cache 2 phút, chi tiết theo slug cache 1 phút. Tạo/cập nhật/xóa/hủy concert và thao tác giữ kho vô hiệu hóa cache liên quan. Thay đổi trực tiếp `TicketType` hiện chưa invalidation nên public detail có thể cũ tối đa 60 giây; stats admin vẫn đọc thẳng DB.
+
+| Cache key/dữ liệu | TTL hiện tại | Invalidation hiện tại | Consistency quan sát được |
+|---|---:|---|---|
+| `cache:concert:list` | 120 giây | Tạo/sửa/xóa/hủy concert; reserve order | Eventual trong TTL, chủ động xóa ở các write path trên |
+| `cache:concert:detail:<slug>` gồm metadata, loại vé và `remainingQty` | 60 giây | Sửa/xóa/hủy concert; tạo order/giữ kho; hiện còn thiếu direct `TicketType` update và worker release-expired | Gần thời gian thực nhưng có thể cũ; DB quyết định khi mua |
+| Admin stats | Không cache | Không áp dụng | Đọc trực tiếp PostgreSQL |
+| Seat-map asset | Chưa tách cache riêng | Theo detail | Có thể tối ưu CDN/TTL dài ở production |
+
+Cache-aside hoạt động: đọc Redis trước; miss thì đọc PostgreSQL và ghi cache với TTL; không cache kết quả `null`. Invalidation dùng `SCAN` theo prefix thay vì `KEYS`. Nếu Redis lỗi, code hiện chưa có bulkhead/fallback DB hoàn chỉnh, vì fallback không giới hạn có thể tạo cache stampede và kéo sập PostgreSQL.
 
 Cache không có quyền quyết định cấp vé: `POST /orders` luôn đọc/khóa DB. Do detail đang gộp metadata và inventory, TTL 60 giây là đánh đổi đơn giản nhưng chưa tối ưu. Thiết kế production nên cache metadata/seat map lâu hơn, tách inventory TTL 1–3 giây hoặc read model riêng, đồng thời invalidate ở cả reserve, release và admin update.
 

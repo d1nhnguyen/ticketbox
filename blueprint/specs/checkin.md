@@ -22,6 +22,46 @@ Không chọn unique `CheckinLog.ticketId`, vì cách đó sẽ ngăn lưu các 
 
 ## Luồng chính
 
+```mermaid
+sequenceDiagram
+  autonumber
+  actor S as Nhân viên soát vé
+  participant PWA as Scanner PWA
+  participant IDB as IndexedDB
+  participant API as Check-in API
+  participant DB as PostgreSQL
+
+  S->>PWA: Chọn concert khi còn mạng
+  PWA->>API: GET snapshot vé hợp lệ + khách VIP
+  API->>DB: Đọc Ticket VALID/Guest INVITED
+  API-->>PWA: Snapshot
+  PWA->>IDB: Thay snapshot, giữ queue PENDING
+  Note over PWA,IDB: Thiết bị mất mạng
+  S->>PWA: Quét QR
+  PWA->>IDB: Tra snapshot và scanQueue
+  alt Không có QR hoặc đã quét trên thiết bị
+    PWA-->>S: INVALID/DUPLICATE cục bộ
+  else Hợp lệ cục bộ
+    PWA->>IDB: Lưu clientLogId + PENDING
+    PWA-->>S: Tạm chấp nhận
+  end
+  Note over PWA,API: Kết nối phục hồi
+  PWA->>API: POST /checkin/sync theo batch
+  loop Mỗi scan trong transaction riêng
+    API->>DB: UPDATE Ticket VALID → USED có điều kiện
+    alt Request đầu tiên đổi được 1 dòng
+      API->>DB: Ghi CheckinLog ACCEPTED
+      API-->>PWA: ACCEPTED
+    else clientLogId đã tồn tại
+      API-->>PWA: ALREADY_SYNCED
+    else Vé đã USED bởi thiết bị khác
+      API->>DB: Ghi CheckinLog FAILED để audit
+      API-->>PWA: DUPLICATE/conflict
+    end
+  end
+  PWA->>IDB: SYNCED hoặc FAILED; không mất record
+```
+
 ### 1. Tải snapshot khi có mạng
 
 1. Scanner đăng nhập và chọn concert.

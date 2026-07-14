@@ -14,6 +14,28 @@ Thành phần nhập danh sách khách VIP theo concert, cô lập lỗi từng 
 
 ## 3. Luồng chính
 
+```mermaid
+flowchart TD
+  A[CSV Inbox được poll hoặc Organizer upload] --> B{Nguồn hợp lệ và concert tồn tại?}
+  B -- Không --> X[Chuyển failed hoặc trả 4xx]
+  B -- Có --> C[Tính SHA-256 trên nội dung]
+  C --> D{Đã có concertId + checksum?}
+  D -- Có --> Y[Không tạo batch/guest trùng; processed hoặc 409]
+  D -- Không --> E[Tạo CsvImportBatch PROCESSING]
+  E --> F[Ghi file tạm và enqueue guests.import]
+  F --> G[Worker kiểm tra header fullName, zone]
+  G --> H{CSV/header hỏng toàn file?}
+  H -- Có --> I[Retry tối đa 3 lần]
+  I --> J[Batch FAILED; file vào failed]
+  H -- Không --> K[Parse stream và validate từng dòng]
+  K --> L{Dòng đủ trường và chưa trùng?}
+  L -- Không --> M[Tăng rowsFailed; tiếp tục dòng sau]
+  L -- Có --> N[createMany skipDuplicates]
+  M --> O[Cập nhật rowsTotal/rowsOk/rowsFailed]
+  N --> O
+  O --> P[Batch SUCCESS; file vào processed]
+```
+
 ### 3.1. Thư mục định kỳ
 
 1. Chép file vào `data/inbox/` trên host.

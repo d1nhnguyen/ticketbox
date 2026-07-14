@@ -47,6 +47,25 @@ sequenceDiagram
 3. **Yêu cầu đã xác thực:** Máy khách gửi `Authorization: Bearer <token>`. `JwtAuthGuard` gọi `JwtStrategy` để kiểm tra chữ ký, hạn dùng bằng `JWT_SECRET`, rồi gắn `{ userId, email, role }` vào `req.user`.
 4. **Phân quyền:** `RolesGuard` đọc metadata của `@Roles(...)` qua `Reflector`. Nếu không khai báo metadata, mọi người dùng đã xác thực đều được qua; nếu có, vai trò phải thuộc tập được yêu cầu.
 
+## Ma trận quyền và điểm enforcement
+
+| Khả năng | Khách/chưa đăng nhập | `AUDIENCE` | `ORGANIZER` | `SCANNER` | Enforcement chính |
+|---|:---:|:---:|:---:|:---:|---|
+| Xem danh sách/chi tiết concert | ✓ | ✓ | ✓ | ✓ | Public API; UI public route |
+| Đăng ký/đăng nhập | ✓ | ✓ | ✓ | ✓ | AuthController + rate limit theo IP |
+| Tạo order, thanh toán, xem vé của mình | ✗ | ✓ | ✗ | ✗ | JWT + `@Roles(AUDIENCE)` + kiểm tra `order.userId` |
+| Quản lý concert/loại vé | ✗ | ✗ | ✓ | ✗ | `/admin/*`: JWT + `@Roles(ORGANIZER)`; admin route guard |
+| Upload PDF bio/CSV, xem doanh thu | ✗ | ✗ | ✓ | ✗ | API role guard; UI ẩn/chặn admin page |
+| Tải snapshot vé/khách VIP | ✗ | ✗ | ✗ | ✓ | JWT + `@Roles(SCANNER)`; Scanner PWA yêu cầu đăng nhập |
+| Đồng bộ check-in/đánh dấu khách VIP | ✗ | ✗ | ✗ | ✓ | API role guard + validation concert/ticket |
+
+### Enforcement theo lớp
+
+1. **API — security boundary:** `JwtAuthGuard` xác minh chữ ký/hạn token và tạo `req.user`; `RolesGuard` đối chiếu `@Roles`; service tiếp tục kiểm tra ownership và state của resource. Sai token trả `401`, đúng token nhưng sai role trả `403`.
+2. **Web/admin UI — defense in depth:** route/menu được ẩn hoặc chuyển hướng theo role để tránh thao tác nhầm, nhưng không thay thế kiểm tra API.
+3. **Scanner PWA:** chỉ role `SCANNER` được tải snapshot và sync. Snapshot/queue cục bộ phục vụ offline; khi online server vẫn xác thực JWT, role và conditional state transition.
+4. **Cấp role:** public registration luôn tạo `AUDIENCE`; `ORGANIZER` và `SCANNER` chỉ được seed/quy trình quản trị cấp, không nhận role từ request client.
+
 ## Kịch bản lỗi
 
 - Email đăng ký đã tồn tại → `400 Bad Request` (`This email is existed!`).
