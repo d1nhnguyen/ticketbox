@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth';
+import { PaymentMethodsProvider } from './hooks/usePaymentMethods';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Navbar } from './components/Navbar';
 
@@ -39,7 +40,8 @@ function ScannerLink() {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <PaymentMethodsProvider>
+        <BrowserRouter>
         <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif', background: '#f9fafb', minHeight: '100vh' }}>
           <Navbar />
           <Routes>
@@ -71,7 +73,8 @@ export default function App() {
             <Route path="*" element={<div style={{ padding: '50px', textAlign: 'center', fontSize: '1.5rem', fontWeight: 'bold' }}>404 - Không tìm thấy trang</div>} />
           </Routes>
         </div>
-      </BrowserRouter>
+        </BrowserRouter>
+      </PaymentMethodsProvider>
     </AuthProvider>
   );
 }

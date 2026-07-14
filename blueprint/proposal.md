@@ -35,10 +35,10 @@ Hệ thống phục vụ 3 nhóm người dùng chính:
 - Xây dựng 7 cơ chế kỹ thuật cốt lõi: Rate Limiting, Idempotency, Circuit Breaker, Offline Sync, Concurrent Booking, CSV Ingestion, Caching.
 - Ứng dụng Backend API, Web cho Admin/Audience, và PWA cho Scanner.
 - Triển khai cục bộ trên môi trường `docker-compose`.
-- Mock API Gateway để mô phỏng tích hợp thanh toán có tỷ lệ rớt/delay.
+- Mock API Gateway là luồng thanh toán mặc định, hoạt động đầy đủ và mô phỏng tỷ lệ lỗi/delay. VNPay sandbox là tích hợp tùy chọn khi có đủ thông tin merchant.
 
 **Ngoài phạm vi (Out of Scope):**
-- Không tích hợp cổng thanh toán thật (VNPay, MoMo) mà sử dụng Mock Gateway.
+- Mock Gateway là phạm vi thanh toán chính và mặc định; VNPay sandbox chỉ là tích hợp tùy chọn, không cần thiết để chạy hoặc chấm demo. MoMo và thanh toán production bằng tiền thật nằm ngoài phạm vi.
 - Không xây dựng Native Mobile App (iOS/Android), thay vào đó là PWA (Progressive Web App).
 - Không chọn ghế cụ thể (Not per-seat assignment), thay vào đó quản lý số lượng theo khu vực (Zone/Ticket Type).
 - Không triển khai trên hạ tầng cloud thực tế (No production infra).
@@ -53,3 +53,5 @@ Dự án phải vượt qua 7 bài toán kỹ thuật (được coi là các cơ
 5. **Data Ingestion:** Upload và xử lý an toàn danh sách CSV lớn (Validation, Idempotency, No-crash).
 6. **Per-user Limits:** Tránh bot đầu cơ gom số lượng lớn vé trong một thời điểm.
 7. **Read-heavy Overload:** Tối ưu hóa Database bằng cơ chế Caching (Redis cache-aside) để giảm tải khi người dùng liên tục F5.
+
+Quyết định dùng Mock Gateway không biến các cơ chế bảo vệ thành stub: rate limiting, circuit breaker, idempotency, retry safety và cache-aside đều chạy bằng implementation thật đối với HTTP gateway mô phỏng. Điều khoản “no stubs” của bài tập được áp dụng đầy đủ cho các cơ chế bảo vệ ở §6/§7; chỉ nhà cung cấp thanh toán bên thứ ba được thay bằng mock theo phạm vi đã công bố.

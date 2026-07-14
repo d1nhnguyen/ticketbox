@@ -3,9 +3,11 @@ import axios from 'axios';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../hooks/useAuth';
 import { Navigate } from 'react-router-dom';
+import { usePaymentMethods } from '../hooks/usePaymentMethods';
 
 export default function AudienceDashboard() {
   const { token, role } = useAuth();
+  const { vnpayEnabled } = usePaymentMethods();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'tickets' | 'history'>('tickets');
@@ -38,6 +40,7 @@ export default function AudienceDashboard() {
   }, [token]);
 
   const handlePayment = async (order: any, method: 'VNPAY' | 'MOCK') => {
+    if (method === 'VNPAY' && !vnpayEnabled) return;
     setPayingOrderId(order.id);
     try {
       if (method === 'VNPAY') {
@@ -287,23 +290,25 @@ export default function AudienceDashboard() {
                             <td style={{ padding: '15px 20px' }}>
                               {order.status === 'PENDING' && (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                  <button
-                                    onClick={() => handlePayment(order, 'VNPAY')}
-                                    disabled={payingOrderId === order.id}
-                                    style={{
-                                      background: '#2563eb',
-                                      color: 'white',
-                                      padding: '6px 14px',
-                                      border: 'none',
-                                      borderRadius: '6px',
-                                      fontWeight: 'bold',
-                                      cursor: payingOrderId === order.id ? 'not-allowed' : 'pointer',
-                                      fontSize: '0.85rem',
-                                      opacity: payingOrderId === order.id ? 0.7 : 1
-                                    }}
-                                  >
-                                    {payingOrderId === order.id ? 'Đang tải...' : 'Thanh toán (VNPay)'}
-                                  </button>
+                                  {vnpayEnabled && (
+                                    <button
+                                      onClick={() => handlePayment(order, 'VNPAY')}
+                                      disabled={payingOrderId === order.id}
+                                      style={{
+                                        background: '#2563eb',
+                                        color: 'white',
+                                        padding: '6px 14px',
+                                        border: 'none',
+                                        borderRadius: '6px',
+                                        fontWeight: 'bold',
+                                        cursor: payingOrderId === order.id ? 'not-allowed' : 'pointer',
+                                        fontSize: '0.85rem',
+                                        opacity: payingOrderId === order.id ? 0.7 : 1
+                                      }}
+                                    >
+                                      {payingOrderId === order.id ? 'Đang tải...' : 'Thanh toán (VNPay)'}
+                                    </button>
+                                  )}
                                   <button
                                     onClick={() => handlePayment(order, 'MOCK')}
                                     disabled={payingOrderId === order.id}

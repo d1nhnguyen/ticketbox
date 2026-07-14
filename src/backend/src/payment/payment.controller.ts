@@ -1,5 +1,6 @@
 import { Controller, Post, Body, Get, Logger } from '@nestjs/common';
 import { PaymentGatewayService } from './payment-gateway.service';
+import { VNPayService } from './vnpay.service';
 import type { PaymentRequest } from './payment.types';
 import {
   SkipRateLimit,
@@ -23,7 +24,22 @@ import {
 export class PaymentController {
   private readonly logger = new Logger(PaymentController.name);
 
-  constructor(private readonly gatewayService: PaymentGatewayService) { }
+  constructor(
+    private readonly gatewayService: PaymentGatewayService,
+    private readonly vnpayService: VNPayService,
+  ) {}
+
+  @SkipRateLimit()
+  @Get('methods')
+  paymentMethods() {
+    return {
+      defaultMethod: 'MOCK',
+      methods: {
+        mock: true,
+        vnpay: this.vnpayService.isEnabled(),
+      },
+    };
+  }
 
   /**
    * Stricter rate limit — values read from env

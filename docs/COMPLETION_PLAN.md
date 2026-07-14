@@ -123,7 +123,9 @@ The gaps originally listed here (`MOCK_API = true`, fabricated pre-download data
 
 ## 3.2 P0 — Payment and Docker runnability
 
-### Current gaps
+> **Implemented and runtime-verified 2026-07-14.** Mock payment is the default path; VNPay is opt-in and requires a complete validated configuration; the web UI discovers enabled methods from the backend; all application services have deterministic Dockerfiles/health checks; and Compose waits for healthy dependencies. An independent clean-volume `docker compose up -d --build` run seeded four concerts, started all six services, completed a mock purchase with QR issuance, and returned HTTP 200 from every public service. A follow-up fixed Nginx container health probes to use `127.0.0.1` rather than IPv6-first `localhost`; `docker compose ps` now reports all six services healthy.
+
+### Original gaps (addressed)
 
 - The backend Compose service does not set `MOCK_PAYMENT_URL=http://mock-gateway:4000`.
 - The web checkout defaults to `VNPAY`, but the default Docker environment provides no VNPay URL, merchant code, secret, or return URL.
@@ -155,14 +157,14 @@ The gaps originally listed here (`MOCK_API = true`, fabricated pre-download data
 
 ### Acceptance gate
 
-- [ ] On a clean machine, `docker compose up -d --build` starts every service.
-- [ ] `GET /health` succeeds.
-- [ ] A seeded audience user can buy through the default mock gateway and receive QR tickets.
+- [x] On a clean machine, `docker compose up -d --build` starts every service.
+- [x] `GET /health` succeeds.
+- [x] A seeded audience user can buy through the default mock gateway and receive QR tickets.
 - [ ] Switching the mock gateway to failure/timeout opens the circuit breaker after the configured threshold.
 - [ ] Concert browsing remains usable while the breaker is open.
 - [ ] A successful retry never creates a second charge or duplicate tickets.
-- [ ] `blueprint/proposal.md` explicitly scopes mock-by-default / VNPay-optional / MoMo-out-of-scope.
-- [ ] README commands work without undocumented environment changes.
+- [x] `blueprint/proposal.md` explicitly scopes mock-by-default / VNPay-optional / MoMo-out-of-scope.
+- [x] README commands work without undocumented environment changes.
 
 ## 3.3 P0 — Security and payment integrity
 

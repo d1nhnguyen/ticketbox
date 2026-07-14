@@ -37,6 +37,12 @@ services:
       - "4000:4000"
     environment:
       GATEWAY_MODE: success
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:4000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
 
   backend:
     build:
@@ -48,43 +54,61 @@ services:
       DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/ticketbox?schema=public
       REDIS_URL: redis://redis:6379
       JWT_SECRET: supersecret_dev
-    volumes:              
-      - ./data:/data       
+      NODE_ENV: production
+      MOCK_PAYMENT_URL: http://mock-gateway:4000
+      VNPAY_ENABLED: "false"
+    volumes:
+      - ./data:/data
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      mock-gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
 
   web:
-    image: node:20-alpine
+    build:
+      context: ./src/web
+      args:
+        VITE_API_URL: http://localhost:3000
+        VITE_SCANNER_URL: http://localhost:5174
     container_name: ticketbox_web
-    working_dir: /app
-    volumes:
-      - ./src/web:/app
     ports:
-      - "5173:5173"
-    environment:
-      # Browser-facing URL — keep localhost:<host-port>, not a service DNS name
-      VITE_SCANNER_URL: http://localhost:5174
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+      - "5173:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
 
   scanner:
-    image: node:20-alpine
+    build:
+      context: ./src/scanner
+      args:
+        VITE_API_URL: http://localhost:3000
     container_name: ticketbox_scanner
-    working_dir: /app
-    volumes:
-      - ./src/scanner:/app
     ports:
-      - "5174:5174"
-    environment:
-      # Browser-facing URL — keep localhost:<host-port>, not a service DNS name
-      VITE_API_URL: http://localhost:3000
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5174"
+      - "5174:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
 
 volumes:
   postgres_data:

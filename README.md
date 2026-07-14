@@ -10,16 +10,15 @@ This README is a step-by-step tutorial for **running the app locally**.
 
 | Tool | Version | Notes |
 | ---- | ------- | ----- |
-| Docker Desktop | 24+ | Runs Postgres, Redis, backend, mock-gateway |
-| Node.js | 20+ | Only needed to run the web / scanner frontends |
-| npm | 9+ | Ships with Node |
+| Docker Desktop | 24+ | Runs the complete six-service stack |
+| Node.js | 20+ | Optional; only needed for host development or load-test scripts |
+| npm | 9+ | Optional; ships with Node.js |
 
-> The backend, database, Redis, and mock payment gateway all run in Docker.
-> The two frontends (web + scanner) run on your host with `npm run dev`.
+> Docker Compose runs Postgres, Redis, backend, mock gateway, web, and scanner. No host-side dependency install is required for the standard demo.
 
 ---
 
-## 2. Quick start (the whole backend in one command)
+## 2. Quick start (the complete stack)
 
 From the repo root:
 
@@ -36,10 +35,14 @@ That's it. On a clean machine this will:
    - seeds 4 concerts + 3 test users (idempotent — skips if already seeded),
    - then boots the NestJS API.
 
-Verify it's up:
+The command also builds production images for the web app (`:5173`) and scanner PWA (`:5174`). Compose health checks gate startup of dependent services.
+
+Verify the stack:
 
 ```bash
 curl http://localhost:3000/concerts
+curl http://localhost:3000/health
+curl http://localhost:4000/health
 ```
 
 You should get a JSON array of **4 concerts**. 🎉
@@ -66,15 +69,15 @@ The seed creates one user per role. Use these to log in via the web app:
 
 ---
 
-## 4. Run the frontends
+## 4. Frontends
 
-The web and scanner apps are **not** in Docker — run them on your host.
+The default Compose stack serves the web app at **http://localhost:5173** and the scanner PWA at **http://localhost:5174**. For optional host development with hot reload, stop the corresponding Compose service and use the commands below.
 
 ### Web app (audience + organizer)
 
 ```bash
 cd src/web
-npm install
+npm ci
 npm run dev
 ```
 
@@ -90,7 +93,7 @@ Run it on a different port so it doesn't collide with the web app:
 
 ```bash
 cd src/scanner
-npm install
+npm ci
 npm run dev -- --port 5174
 ```
 
@@ -106,8 +109,8 @@ Opens on **http://localhost:5174**.
 | Mock payment gateway | http://localhost:4000 | Docker |
 | Postgres | localhost:5432 | Docker |
 | Redis | localhost:6379 | Docker |
-| Web app | http://localhost:5173 | host (`npm run dev`) |
-| Scanner app | http://localhost:5174 | host (`npm run dev`) |
+| Web app | http://localhost:5173 | Docker (Nginx static image) |
+| Scanner app | http://localhost:5174 | Docker (Nginx static PWA image) |
 
 Key public API endpoints:
 
@@ -119,6 +122,8 @@ Key public API endpoints:
 
 ## 6. Mock payment gateway
 
+Mock payment is the default, fully working demo path. The browser opens the mock checkout page; successful confirmation returns to the web app, while the backend owns the `PENDING → PAID` transition, charge idempotency, and QR ticket issuance.
+
 The gateway can simulate three outcomes, switchable live (used to demo the circuit breaker):
 
 ```bash
@@ -129,6 +134,20 @@ curl -X POST http://localhost:4000/admin/mode \
 ```
 
 The default mode is set by `GATEWAY_MODE` in [docker-compose.yml](docker-compose.yml).
+
+### Optional VNPay sandbox
+
+VNPay is disabled by default. To enable it, set the complete backend configuration and rebuild:
+
+```env
+VNPAY_ENABLED=true
+VNPAY_URL=https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
+VNPAY_TMN_CODE=your_merchant_code
+VNPAY_HASH_SECRET=your_hash_secret
+VNPAY_RETURN_URL=http://localhost:5173/vnpay-return
+```
+
+The backend refuses to start if VNPay is enabled with missing values. The web UI reads `GET /payment/methods`, so VNPay controls remain hidden until the backend reports a complete configuration. MoMo and production payment processing are out of scope.
 
 ---
 
@@ -275,7 +294,7 @@ The host `.env` already points `DATABASE_URL` / `REDIS_URL` at `localhost`.
 
 ```
 ticketbox/
-├─ docker-compose.yml        # postgres, redis, backend, mock-gateway
+├─ docker-compose.yml        # complete six-service stack
 ├─ data/seed/                # seed data (concerts.json, users.json)
 ├─ src/
 │  ├─ backend/               # NestJS API (Prisma, auth, concerts, payment)

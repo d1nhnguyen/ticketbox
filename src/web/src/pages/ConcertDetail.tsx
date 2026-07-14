@@ -4,12 +4,14 @@ import axios from 'axios';
 import { QRCodeSVG } from 'qrcode.react';
 
 import { useAuth } from '../hooks/useAuth';
+import { usePaymentMethods } from '../hooks/usePaymentMethods';
 
 export default function ConcertDetail() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { token, role } = useAuth();
+  const { vnpayEnabled } = usePaymentMethods();
 
   const [concert, setConcert] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -18,7 +20,7 @@ export default function ConcertDetail() {
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
   const [issuedTickets] = useState<any[]>([]);
-  const [paymentMethod, setPaymentMethod] = useState<'VNPAY' | 'MOCK'>('VNPAY');
+  const [paymentMethod, setPaymentMethod] = useState<'VNPAY' | 'MOCK'>('MOCK');
 
   // Hiển thị lỗi từ cổng thanh toán truyền về nếu có và hủy order ngay lập tức để giải phóng vé
   useEffect(() => {
@@ -137,7 +139,7 @@ export default function ConcertDetail() {
 
       const orderId = response.data.id;
 
-      if (paymentMethod === 'VNPAY') {
+      if (paymentMethod === 'VNPAY' && vnpayEnabled) {
         const vnpayRes = await axios.get(
           `http://localhost:3000/orders/vnpay/url/${orderId}`,
           { headers: { Authorization: `Bearer ${token}` } }
@@ -404,16 +406,18 @@ export default function ConcertDetail() {
               <div style={{ marginBottom: '20px' }}>
                 <p style={{ marginBottom: '10px', fontSize: '0.9rem', color: '#94a3b8' }}>Phương thức thanh toán:</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value="VNPAY"
-                      checked={paymentMethod === 'VNPAY'}
-                      onChange={() => setPaymentMethod('VNPAY')}
-                    />
-                    <span style={{ color: paymentMethod === 'VNPAY' ? 'white' : '#94a3b8' }}>Thẻ nội địa - VNPay (Demo)</span>
-                  </label>
+                  {vnpayEnabled && (
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        value="VNPAY"
+                        checked={paymentMethod === 'VNPAY'}
+                        onChange={() => setPaymentMethod('VNPAY')}
+                      />
+                      <span style={{ color: paymentMethod === 'VNPAY' ? 'white' : '#94a3b8' }}>Thẻ nội địa - VNPay Sandbox</span>
+                    </label>
+                  )}
                   <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
                     <input
                       type="radio"
@@ -422,7 +426,7 @@ export default function ConcertDetail() {
                       checked={paymentMethod === 'MOCK'}
                       onChange={() => setPaymentMethod('MOCK')}
                     />
-                    <span style={{ color: paymentMethod === 'MOCK' ? 'white' : '#94a3b8' }}>Thẻ quốc tế - Mock Gateway</span>
+                    <span style={{ color: paymentMethod === 'MOCK' ? 'white' : '#94a3b8' }}>Mock Gateway (mặc định)</span>
                   </label>
                 </div>
               </div>

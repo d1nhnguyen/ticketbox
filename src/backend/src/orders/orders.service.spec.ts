@@ -15,6 +15,7 @@ import { OrdersService } from './orders.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { REDIS_CLIENT } from 'src/common/redis/redis.module';
 import { PaymentGatewayService } from 'src/payment/payment-gateway.service';
+import { VNPayService } from 'src/payment/vnpay.service';
 import { CacheService } from 'src/common/cache/cache.service';
 
 const USER_ID = 'user-1';
@@ -70,6 +71,7 @@ describe('OrdersService.confirmPayment', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: REDIS_CLIENT, useValue: {} },
         { provide: PaymentGatewayService, useValue: payment },
+        { provide: VNPayService, useValue: {} },
         { provide: CacheService, useValue: { invalidateConcert: jest.fn() } },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
         { provide: getQueueToken('orders'), useValue: { add: jest.fn() } },
@@ -166,7 +168,9 @@ describe('OrdersService.confirmPayment', () => {
     prisma.order.findUnique.mockResolvedValue(pendingOrder());
     // breaker OPEN → the gateway's fallback throws ServiceUnavailableException
     payment.charge.mockRejectedValue(
-      new ServiceUnavailableException('Payment service is currently unavailable.'),
+      new ServiceUnavailableException(
+        'Payment service is currently unavailable.',
+      ),
     );
 
     await expect(service.confirmPayment(ORDER_ID, USER_ID)).rejects.toThrow(

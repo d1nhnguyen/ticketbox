@@ -16,6 +16,10 @@ let gatewayMode: 'success' | 'timeout' | 'failure' = (process.env.GATEWAY_MODE a
 // instead of charging again — mirrors how VNPAY/MoMo dedup retries / double-clicks.
 const idempotencyStore = new Map<string, any>();
 
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', mode: gatewayMode });
+});
+
 app.get('/pay', (req, res) => {
   const { orderId, amount, concertSlug } = req.query;
 

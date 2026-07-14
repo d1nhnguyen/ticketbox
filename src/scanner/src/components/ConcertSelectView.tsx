@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { CalendarDays, MapPin, RefreshCw, LogOut } from 'lucide-react';
 import { fetchConcerts, type ConcertSummary } from '../services/api';
 import { setSelectedConcert, type SelectedConcert } from '../services/session';
@@ -13,39 +13,44 @@ export default function ConcertSelectView({ accountEmail, onSelected, onLogout }
   const [concerts, setConcerts] = useState<ConcertSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const mountedRef = useRef(false);
+  const requestIdRef = useRef(0);
 
   const load = useCallback(async () => {
+    if (!mountedRef.current) return;
+
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     setError('');
     try {
-      setConcerts(await fetchConcerts());
+      const data = await fetchConcerts();
+      if (mountedRef.current && requestId === requestIdRef.current) {
+        setConcerts(data);
+      }
     } catch {
-      setError('Không tải được danh sách sự kiện. Kiểm tra mạng và thử lại.');
+      if (mountedRef.current && requestId === requestIdRef.current) {
+        setError('Không tải được danh sách sự kiện. Kiểm tra mạng và thử lại.');
+      }
     } finally {
-      setLoading(false);
+      if (mountedRef.current && requestId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    void fetchConcerts()
-      .then((data) => {
-        if (!cancelled) setConcerts(data);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setError('Không tải được danh sách sự kiện. Kiểm tra mạng và thử lại.');
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+    mountedRef.current = true;
+    // Schedule the initial request outside the effect body; load() is also the
+    // single implementation used by the retry button.
+    const initialLoad = window.setTimeout(() => void load(), 0);
 
     return () => {
-      cancelled = true;
+      window.clearTimeout(initialLoad);
+      mountedRef.current = false;
+      // Invalidate every in-flight request so a late response cannot commit.
+      requestIdRef.current += 1;
     };
-  }, []);
+  }, [load]);
 
   const handlePick = (c: ConcertSummary) => {
     const concert: SelectedConcert = { id: c.id, title: c.title };

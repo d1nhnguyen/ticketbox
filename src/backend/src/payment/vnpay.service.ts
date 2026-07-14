@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import * as querystring from 'querystring';
@@ -9,12 +9,22 @@ export class VNPayService {
   private tmnCode: string;
   private hashSecret: string;
   private returnUrl: string;
+  private enabled: boolean;
 
   constructor(private configService: ConfigService) {
     this.vnpayUrl = this.configService.get<string>('VNPAY_URL') || '';
     this.tmnCode = this.configService.get<string>('VNPAY_TMN_CODE') || '';
     this.hashSecret = this.configService.get<string>('VNPAY_HASH_SECRET') || '';
     this.returnUrl = this.configService.get<string>('VNPAY_RETURN_URL') || '';
+    const enabled = this.configService.get<string | boolean>(
+      'VNPAY_ENABLED',
+      false,
+    );
+    this.enabled = enabled === true || enabled === 'true';
+  }
+
+  isEnabled(): boolean {
+    return this.enabled && this.hasCompleteConfig();
   }
 
   /**
@@ -34,10 +44,18 @@ export class VNPayService {
     bankCode?: string,
     language: string = 'vn',
   ): string {
+    if (!this.isEnabled()) {
+      throw new ServiceUnavailableException(
+        'VNPay is disabled or incompletely configured. Use the mock payment method.',
+      );
+    }
+
     const date = new Date();
     const createDate = this.formatDate(date);
     // expire in 10 minutes (matching PENDING order expiry)
-    const expireDate = this.formatDate(new Date(date.getTime() + 10 * 60 * 1000));
+    const expireDate = this.formatDate(
+      new Date(date.getTime() + 10 * 60 * 1000),
+    );
 
     let vnpParams: any = {
       vnp_Version: '2.1.0',
@@ -76,7 +94,8 @@ export class VNPayService {
     vnpParams.vnp_SecureHash = signed;
 
     // Build payment URL
-    const paymentUrl = this.vnpayUrl + '?' + signData + '&vnp_SecureHash=' + signed;
+    const paymentUrl =
+      this.vnpayUrl + '?' + signData + '&vnp_SecureHash=' + signed;
 
     return paymentUrl;
   }
@@ -91,6 +110,14 @@ export class VNPayService {
     message: string;
     data?: any;
   } {
+    if (!this.isEnabled()) {
+      return {
+        success: false,
+        code: '98',
+        message: 'VNPay is disabled',
+      };
+    }
+
     const vnpParams = { ...query };
     const secureHash = vnpParams.vnp_SecureHash;
 
@@ -101,7 +128,10 @@ export class VNPayService {
 
     const signData = Object.keys(sortedParams)
       .map((key) => {
-        const value = encodeURIComponent(sortedParams[key]).replace(/%20/g, '+');
+        const value = encodeURIComponent(sortedParams[key]).replace(
+          /%20/g,
+          '+',
+        );
         return `${key}=${value}`;
       })
       .join('&');
@@ -157,6 +187,15 @@ export class VNPayService {
       sorted[key] = obj[key];
     });
     return sorted;
+  }
+
+  private hasCompleteConfig(): boolean {
+    return Boolean(
+      this.vnpayUrl.trim() &&
+      this.tmnCode.trim() &&
+      this.hashSecret.trim() &&
+      this.returnUrl.trim(),
+    );
   }
 
   /**

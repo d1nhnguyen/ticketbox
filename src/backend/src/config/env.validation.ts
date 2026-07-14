@@ -33,14 +33,39 @@ export const envValidationSchema = Joi.object({
   PORT: Joi.number().integer().min(1).max(65535).default(3000),
 
   // Payment gateway
-  MOCK_PAYMENT_URL: Joi.string()
-    .uri()
-    .default('http://localhost:4000'),
+  MOCK_PAYMENT_URL: Joi.string().uri().default('http://localhost:4000'),
+
+  // VNPay is opt-in. Enabling it without a complete credential set must stop
+  // the app at bootstrap instead of producing an invalid/unsigned URL.
+  VNPAY_ENABLED: Joi.boolean().truthy('true').falsy('false').default(false),
+  VNPAY_URL: Joi.when('VNPAY_ENABLED', {
+    is: true,
+    then: Joi.string().uri().required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+  VNPAY_TMN_CODE: Joi.when('VNPAY_ENABLED', {
+    is: true,
+    then: Joi.string().trim().min(1).required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+  VNPAY_HASH_SECRET: Joi.when('VNPAY_ENABLED', {
+    is: true,
+    then: Joi.string().trim().min(1).required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+  VNPAY_RETURN_URL: Joi.when('VNPAY_ENABLED', {
+    is: true,
+    then: Joi.string().uri().required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
 
   // Circuit Breaker tuning
   CIRCUIT_BREAKER_TIMEOUT_MS: Joi.number().integer().positive().default(5000),
   CIRCUIT_BREAKER_ERROR_THRESHOLD: Joi.number().min(1).max(100).default(50),
-  CIRCUIT_BREAKER_RESET_TIMEOUT_MS: Joi.number().integer().positive().default(10000),
+  CIRCUIT_BREAKER_RESET_TIMEOUT_MS: Joi.number()
+    .integer()
+    .positive()
+    .default(10000),
   CIRCUIT_BREAKER_VOL_THRESHOLD: Joi.number().integer().positive().default(5),
 
   // Rate limiting — global bucket
