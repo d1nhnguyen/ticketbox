@@ -168,4 +168,17 @@ describe('VNPayService.verifyReturnUrl', () => {
 
     expect(result).toMatchObject({ success: false, code: '04' });
   });
+
+  it('rejects a correctly signed callback with no currency', () => {
+    const service = createEnabledService();
+    const query = buildSignedReturnQuery();
+    delete query.vnp_CurrCode;
+    delete query.vnp_SecureHash;
+    query.vnp_SecureHash = signParams(HASH_SECRET, query);
+
+    expect(service.verifyReturnUrl(query)).toMatchObject({
+      success: false,
+      code: '04',
+    });
+  });
 });
