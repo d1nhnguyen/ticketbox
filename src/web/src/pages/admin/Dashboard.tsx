@@ -3,6 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../../hooks/useAuth';
 
+interface ConcertStats {
+  totalRevenue: number;
+  ticketTypes: Array<{ soldQty: number }>;
+}
+
 export default function Dashboard() {
   const { token } = useAuth();
   const navigate = useNavigate();
@@ -31,15 +36,27 @@ export default function Dashboard() {
       });
       setConcerts(resConcerts.data);
 
-      let revenue = 0;
-      let sold = 0;
-      resConcerts.data.forEach((c: any) => {
-        c.ticketTypes?.forEach((t: any) => {
-          const soldTickets = t.totalQty - t.remainingQty;
-          sold += soldTickets;
-          revenue += soldTickets * t.price;
-        });
-      });
+      const statsResponses = await Promise.all(
+        resConcerts.data.map((concert: any) =>
+          axios.get<ConcertStats>(
+            `http://localhost:3000/admin/concerts/${concert.id}/stats`,
+            { headers: { Authorization: `Bearer ${token}` } },
+          ),
+        ),
+      );
+
+      const revenue = statsResponses.reduce(
+        (sum, response) => sum + response.data.totalRevenue,
+        0,
+      );
+      const sold = statsResponses.reduce(
+        (sum, response) =>
+          sum + response.data.ticketTypes.reduce(
+            (ticketSum: number, ticketType: { soldQty: number }) => ticketSum + ticketType.soldQty,
+            0,
+          ),
+        0,
+      );
 
       setStats({ totalRevenue: revenue, totalTicketsSold: sold });
     } catch (err) {
@@ -181,7 +198,7 @@ export default function Dashboard() {
           boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
         }}>
           <h3 style={{ color: '#6b7280', fontSize: '1rem', marginBottom: '10px', fontWeight: 500 }}>
-            💰 Tổng Doanh Thu (Ước tính)
+            💰 Tổng Doanh Thu (đã thanh toán)
           </h3>
           <p style={{ fontSize: '2rem', fontWeight: 800, color: '#10b981', margin: 0 }}>
             {stats.totalRevenue.toLocaleString('vi-VN')} VNĐ

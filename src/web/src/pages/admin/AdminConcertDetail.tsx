@@ -44,6 +44,16 @@ interface Concert {
   ticketTypes: TicketType[];
 }
 
+interface ConcertStats {
+  totalRevenue: number;
+  totalOrders: number;
+  ticketTypes: Array<{
+    id: string;
+    soldQty: number;
+    revenue: number;
+  }>;
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const API = 'http://localhost:3000';
@@ -70,6 +80,7 @@ export default function AdminConcertDetail() {
 
   // Concert state
   const [concert, setConcert] = useState<Concert | null>(null);
+  const [stats, setStats] = useState<ConcertStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'tickets' | 'bio' | 'guests' | 'info'>('tickets');
 
@@ -124,6 +135,17 @@ export default function AdminConcertDetail() {
     }
   };
 
+  const fetchStats = async () => {
+    try {
+      const res = await axios.get<ConcertStats>(`${API}/admin/concerts/${id}/stats`, {
+        headers: authHeader,
+      });
+      setStats(res.data);
+    } catch {
+      setStats(null);
+    }
+  };
+
   const fetchBatches = async () => {
     try {
       const res = await axios.get(`${API}/admin/concerts/${id}/guests/batches`, { headers: authHeader });
@@ -140,6 +162,7 @@ export default function AdminConcertDetail() {
 
   useEffect(() => {
     fetchConcert();
+    fetchStats();
     fetchBatches();
     fetchGuests();
     return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
@@ -186,7 +209,7 @@ export default function AdminConcertDetail() {
         setTtSuccess(`✅ Đã tạo hạng vé "${name}"`);
       }
       resetTtForm();
-      await fetchConcert();
+      await Promise.all([fetchConcert(), fetchStats()]);
     } catch (err: any) {
       const msg = err.response?.data?.message;
       setTtError(Array.isArray(msg) ? msg.join(', ') : (msg || 'Lỗi lưu hạng vé.'));
@@ -197,7 +220,7 @@ export default function AdminConcertDetail() {
     if (!confirm(`Xóa hạng vé "${tt.name}"? Chỉ xóa được nếu chưa có vé nào bán.`)) return;
     try {
       await axios.delete(`${API}/admin/ticket-types/${tt.id}`, { headers: authHeader });
-      await fetchConcert();
+      await Promise.all([fetchConcert(), fetchStats()]);
     } catch (err: any) {
       alert(err.response?.data?.message || 'Không thể xóa hạng vé này.');
     }
@@ -299,8 +322,9 @@ export default function AdminConcertDetail() {
   );
   if (!concert) return null;
 
-  const soldTotal = concert.ticketTypes.reduce((s, t) => s + (t.totalQty - t.remainingQty), 0);
-  const revenueTotal = concert.ticketTypes.reduce((s, t) => s + (t.totalQty - t.remainingQty) * t.price, 0);
+  const soldTotal = stats?.ticketTypes.reduce((sum, ticketType) => sum + ticketType.soldQty, 0) ?? 0;
+  const revenueTotal = stats?.totalRevenue ?? 0;
+  const statsByTicketType = new Map(stats?.ticketTypes.map(ticketType => [ticketType.id, ticketType]) ?? []);
 
   const statusColors: Record<string, [string, string, string]> = {
     ON_SALE: ['#059669', '#f0fdf4', '#bbf7d0'],
@@ -572,7 +596,7 @@ export default function AdminConcertDetail() {
                   </thead>
                   <tbody>
                     {concert.ticketTypes.map(tt => {
-                      const sold = tt.totalQty - tt.remainingQty;
+                      const sold = statsByTicketType.get(tt.id)?.soldQty ?? 0;
                       const pct = tt.totalQty > 0 ? Math.round(sold / tt.totalQty * 100) : 0;
                       return (
                         <tr key={tt.id} style={{ borderBottom: '1px solid #f3f4f6', background: editTt?.id === tt.id ? '#fffbeb' : 'white' }}>

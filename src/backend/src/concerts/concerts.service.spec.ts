@@ -301,6 +301,33 @@ describe('ConcertsService', () => {
   // ── Admin: getStats ────────────────────────────────────────────────────────
 
   describe('getStats', () => {
+    it('queries revenue and sold quantities from PAID orders only', async () => {
+      mockPrisma.concert.findUnique.mockResolvedValue(makeConcert());
+      mockPrisma.order.aggregate.mockResolvedValue({
+        _sum: { totalAmount: 1000000 },
+        _count: { id: 1 },
+      });
+      mockPrisma.$queryRaw.mockResolvedValue([
+        { ticketTypeId: 'tt-1', soldQty: 1, revenue: 1000000 },
+      ]);
+      mockPrisma.ticketType.findMany.mockResolvedValue([
+        { id: 'tt-1', name: 'VIP', price: 1000000, totalQty: 10, remainingQty: 8 },
+      ]);
+
+      const stats = await service.getStats('concert-1');
+
+      expect(mockPrisma.order.aggregate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { concertId: 'concert-1', status: OrderStatus.PAID },
+        }),
+      );
+      const sql = mockPrisma.$queryRaw.mock.calls[0][0].join(' ');
+      expect(sql).toContain("o.status = 'PAID'");
+      expect(stats.totalRevenue).toBe(1000000);
+      expect(stats.ticketTypes[0].soldQty).toBe(1);
+      expect(stats.ticketTypes[0].remainingQty).toBe(8);
+    });
+
     it('returns total revenue and per-type breakdown', async () => {
       mockPrisma.concert.findUnique.mockResolvedValue(makeConcert());
       mockPrisma.order.aggregate.mockResolvedValue({
