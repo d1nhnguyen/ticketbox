@@ -13,8 +13,7 @@ import {
   type SelectedConcert,
 } from './services/session';
 import { db } from './db/db';
-import { Wifi, WifiOff, DownloadCloud, LogOut, Repeat } from 'lucide-react';
-import './App.css'; // Just basic reset
+import { Wifi, WifiOff, DownloadCloud, LogOut, Repeat, ScanLine, Users } from 'lucide-react';
 
 type View = 'LOGIN' | 'SELECT_CONCERT' | 'SCAN';
 
@@ -110,52 +109,50 @@ export default function App() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f3f4f6', fontFamily: 'system-ui, sans-serif' }}>
+    <div className="scan-shell">
       {/* Header */}
-      <header style={{ background: 'white', padding: '12px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', position: 'sticky', top: 0, zIndex: 10 }}>
+      <header className="scan-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ minWidth: 0 }}>
-            <h1 style={{ margin: 0, fontSize: '1.1rem', color: '#111827', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              🎫 {concert?.title ?? 'TB Scanner'}
+            <h1 style={{ fontSize: 17, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {concert?.title ?? 'TB Scanner'}
             </h1>
-            <span style={{ color: '#6b7280', fontSize: '0.8rem' }}>{session?.email}</span>
+            <span style={{ color: 'var(--text-3)', fontSize: 13 }}>{session?.email}</span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: isOnline ? '#16a34a' : '#ef4444', fontWeight: 'bold', fontSize: '0.9rem' }}>
-              {isOnline ? <><Wifi size={18} /> Online</> : <><WifiOff size={18} /> Offline</>}
-            </div>
-            <button
-              onClick={handleLogout}
-              title="Đăng xuất"
-              style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}
-            >
-              <LogOut size={18} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+            <span className={isOnline ? 'badge badge-success' : 'badge badge-danger'}>
+              {isOnline ? <><Wifi size={14} /> Online</> : <><WifiOff size={14} /> Offline</>}
+            </span>
+            <button className="btn btn-ghost" onClick={handleLogout} title="Đăng xuất" style={{ padding: 6 }}>
+              <LogOut size={18} color="var(--danger)" />
             </button>
           </div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', gap: '10px', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <button
+              className="btn btn-ghost"
               onClick={handlePreDownload}
               disabled={!isOnline || isDownloading}
-              style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'none', border: 'none', color: (!isOnline || isDownloading) ? '#9ca3af' : '#2563eb', fontWeight: 600, cursor: (!isOnline || isDownloading) ? 'not-allowed' : 'pointer', padding: 0 }}
+              style={{ padding: 0, color: (!isOnline || isDownloading) ? 'var(--text-3)' : 'var(--primary)' }}
             >
-              <DownloadCloud size={18} />
+              <DownloadCloud size={16} />
               {isDownloading ? 'Đang tải...' : 'Tải dữ liệu'}
             </button>
 
             <button
+              className="btn btn-ghost"
               onClick={() => setView('SELECT_CONCERT')}
               disabled={!isOnline}
-              style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'none', border: 'none', color: !isOnline ? '#9ca3af' : '#2563eb', fontWeight: 600, cursor: !isOnline ? 'not-allowed' : 'pointer', padding: 0 }}
+              style={{ padding: 0, color: !isOnline ? 'var(--text-3)' : 'var(--primary)' }}
             >
-              <Repeat size={16} /> Đổi sự kiện
+              <Repeat size={14} /> Đổi sự kiện
             </button>
           </div>
 
-          <span style={{ color: '#6b7280', fontSize: '0.75rem' }}>
+          <span style={{ color: 'var(--text-3)', fontSize: 12 }}>
             {snapshot?.concertId === concert?.id && snapshot?.downloadedAt
               ? `Snapshot: ${snapshot.ticketCount} vé, ${snapshot.guestCount} khách · ${new Date(snapshot.downloadedAt).toLocaleString('vi-VN')}`
               : 'Chưa tải dữ liệu cho sự kiện này'}
@@ -163,30 +160,34 @@ export default function App() {
         </div>
 
         {downloadError && (
-          <p style={{ margin: '8px 0 0 0', color: '#dc2626', fontSize: '0.85rem' }}>{downloadError}</p>
+          <div className="alert alert-danger" style={{ marginTop: 10, padding: '8px 12px' }}>{downloadError}</div>
         )}
       </header>
 
       {/* Main Content */}
-      <main style={{ paddingBottom: '70px' }}>
+      <main className="scan-main">
         {activeTab === 'SCANNER'
           ? <ScannerTab concertId={concert!.id} />
           : <VIPTab concertId={concert!.id} />}
       </main>
 
-      {/* Bottom Navigation */}
-      <nav style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '1126px', background: 'white', display: 'flex', borderTop: '1px solid #e5e7eb', zIndex: 10, boxSizing: 'border-box' }}>
+      {/* Navigation: bottom tab bar on phones, left rail on desktop */}
+      <nav className="scan-nav">
         <button
+          className={`scan-nav-btn${activeTab === 'SCANNER' ? ' active' : ''}`}
           onClick={() => setActiveTab('SCANNER')}
-          style={{ flex: 1, padding: '15px', border: 'none', background: 'none', color: activeTab === 'SCANNER' ? '#2563eb' : '#6b7280', fontWeight: activeTab === 'SCANNER' ? 700 : 500, fontSize: '1rem', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }}
+          aria-current={activeTab === 'SCANNER'}
         >
-          📷 Soát vé
+          <ScanLine size={20} />
+          Soát vé
         </button>
         <button
+          className={`scan-nav-btn${activeTab === 'VIP' ? ' active' : ''}`}
           onClick={() => setActiveTab('VIP')}
-          style={{ flex: 1, padding: '15px', border: 'none', background: 'none', color: activeTab === 'VIP' ? '#2563eb' : '#6b7280', fontWeight: activeTab === 'VIP' ? 700 : 500, fontSize: '1rem', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }}
+          aria-current={activeTab === 'VIP'}
         >
-          👑 Danh sách VIP
+          <Users size={20} />
+          Danh sách VIP
         </button>
       </nav>
     </div>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { CalendarDays, MapPin, RefreshCw, LogOut } from 'lucide-react';
+import { CalendarDays, MapPin, RefreshCw, LogOut, Ticket } from 'lucide-react';
 import { fetchConcerts, type ConcertSummary } from '../services/api';
 import { setSelectedConcert, type SelectedConcert } from '../services/session';
 
@@ -59,54 +59,54 @@ export default function ConcertSelectView({ accountEmail, onSelected, onLogout }
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f3f4f6', fontFamily: 'system-ui, sans-serif' }}>
-      <header style={{ background: 'white', padding: '15px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-        <h1 style={{ margin: 0, fontSize: '1.2rem', color: '#111827', fontWeight: 800 }}>🎫 Chọn sự kiện</h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ color: '#6b7280', fontSize: '0.85rem' }}>{accountEmail}</span>
-          <button
-            onClick={onLogout}
-            style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'none', border: 'none', color: '#ef4444', fontWeight: 600, cursor: 'pointer' }}
-          >
+    <div className="scan-shell">
+      <header className="scan-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Ticket size={18} color="var(--primary)" />
+          <h1 style={{ fontSize: 17 }}>Chọn sự kiện</h1>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ color: 'var(--text-3)', fontSize: 13 }}>{accountEmail}</span>
+          <button className="btn btn-ghost" onClick={onLogout} style={{ padding: 6, color: 'var(--danger)' }}>
             <LogOut size={18} /> Đăng xuất
           </button>
         </div>
       </header>
 
-      <main style={{ padding: '20px', maxWidth: '500px', margin: '0 auto' }}>
-        {loading && <p style={{ textAlign: 'center', color: '#6b7280' }}>Đang tải danh sách sự kiện...</p>}
+      <main style={{ padding: 20, maxWidth: 500, margin: '0 auto' }}>
+        {loading && (
+          <div style={{ textAlign: 'center', padding: 20 }}>
+            <div className="spinner" style={{ margin: '0 auto 10px' }} />
+            <p style={{ color: 'var(--text-2)' }}>Đang tải danh sách sự kiện...</p>
+          </div>
+        )}
 
         {error && (
           <div style={{ textAlign: 'center' }}>
-            <p style={{ color: '#dc2626' }}>{error}</p>
-            <button
-              onClick={() => void load()}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '10px 18px', borderRadius: '8px', border: 'none', background: '#2563eb', color: 'white', fontWeight: 600, cursor: 'pointer' }}
-            >
+            <p style={{ color: 'var(--danger)', marginBottom: 12 }}>{error}</p>
+            <button className="btn btn-primary" onClick={() => void load()}>
               <RefreshCw size={16} /> Thử lại
             </button>
           </div>
         )}
 
         {!loading && !error && concerts.length === 0 && (
-          <p style={{ textAlign: 'center', color: '#6b7280' }}>Chưa có sự kiện nào.</p>
+          <p style={{ textAlign: 'center', color: 'var(--text-2)' }}>Chưa có sự kiện nào.</p>
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {concerts.map((c) => (
             <button
               key={c.id}
               onClick={() => handlePick(c)}
-              style={{
-                textAlign: 'left', background: 'white', border: '2px solid #e5e7eb', borderRadius: '12px',
-                padding: '16px', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-              }}
+              className="card"
+              style={{ textAlign: 'left', padding: 16, cursor: 'pointer', border: '2px solid var(--border)' }}
             >
-              <h3 style={{ margin: '0 0 8px 0', fontSize: '1.1rem', color: '#111827' }}>{c.title}</h3>
-              <p style={{ margin: '0 0 4px 0', color: '#6b7280', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <h3 style={{ fontSize: 17, marginBottom: 8 }}>{c.title}</h3>
+              <p style={{ margin: '0 0 4px 0', color: 'var(--text-2)', fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <MapPin size={14} /> {c.venue}
               </p>
-              <p style={{ margin: 0, color: '#6b7280', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <p style={{ margin: 0, color: 'var(--text-2)', fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <CalendarDays size={14} /> {new Date(c.startsAt).toLocaleString('vi-VN')}
               </p>
             </button>

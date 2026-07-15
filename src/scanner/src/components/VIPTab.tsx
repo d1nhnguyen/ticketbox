@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type GuestCheckinRecord, type GuestListEntry } from '../db/db';
 import { syncPendingRecords } from '../services/syncEngine';
-import { Search, UserCheck, CloudUpload, CloudOff } from 'lucide-react';
+import { Search, UserCheck, CloudUpload, CloudOff, Crown } from 'lucide-react';
 
 interface Props {
   concertId: string;
@@ -67,69 +67,68 @@ export default function VIPTab({ concertId }: Props) {
 
     if (record.syncStatus === 'PENDING') {
       return (
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#b45309', fontSize: '0.8rem', fontWeight: 600 }}>
+        <span className="badge badge-warning">
           <CloudOff size={14} /> Chờ đồng bộ
         </span>
       );
     }
     if (record.syncStatus === 'SYNCED') {
       return (
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#16a34a', fontSize: '0.8rem', fontWeight: 600 }}>
+        <span className="badge badge-success">
           <CloudUpload size={14} />
           {record.resolution === 'ALREADY_CHECKED_IN' ? 'Đã đồng bộ (check-in nơi khác)' : 'Đã đồng bộ'}
         </span>
       );
     }
     return (
-      <span style={{ color: '#dc2626', fontSize: '0.8rem', fontWeight: 600 }}>
+      <span className="badge badge-danger">
         {record.resolution === 'NOT_FOUND' ? 'Lỗi: không tìm thấy khách trên server' : 'Lỗi đồng bộ'}
       </span>
     );
   };
 
   return (
-    <div style={{ padding: '20px', maxWidth: '500px', margin: '0 auto' }}>
-      <h2 style={{ fontSize: '1.5rem', marginBottom: '20px', textAlign: 'center' }}>👑 VIP Guest List</h2>
+    <div style={{ padding: 20, maxWidth: 500, margin: '0 auto' }}>
+      <h2 style={{ fontSize: 20, marginBottom: 20, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+        <Crown size={22} color="var(--primary)" /> VIP Guest List
+      </h2>
 
-      <div style={{ position: 'relative', marginBottom: '20px' }}>
-        <Search style={{ position: 'absolute', left: '15px', top: '15px', color: '#9ca3af' }} size={20} />
+      <div style={{ position: 'relative', marginBottom: 20 }}>
+        <Search style={{ position: 'absolute', left: 14, top: 14, color: 'var(--text-3)' }} size={20} />
         <input
           type="text"
           placeholder="Tìm kiếm theo Tên hoặc Số giấy tờ..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          style={{ width: '100%', padding: '15px 15px 15px 45px', boxSizing: 'border-box', borderRadius: '8px', border: '1.5px solid #d1d5db', fontSize: '1rem', outline: 'none' }}
+          className="input"
+          style={{ paddingLeft: 44 }}
         />
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
         {searchTerm && guests?.length === 0 && (
-          <p style={{ textAlign: 'center', color: '#6b7280' }}>Không tìm thấy khách mời phù hợp.</p>
+          <p style={{ textAlign: 'center', color: 'var(--text-2)' }}>Không tìm thấy khách mời phù hợp.</p>
         )}
 
         {guests?.map(guest => (
-          <div key={guest.id} style={{
-            padding: '20px', background: 'white', borderRadius: '12px',
-            border: `2px solid ${guest.status === 'CHECKED_IN' ? '#22c55e' : '#e5e7eb'}`,
-            boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+          <div key={guest.id} className="card" style={{
+            padding: 20,
+            borderColor: guest.status === 'CHECKED_IN' ? 'var(--success)' : 'var(--border)',
+            borderWidth: 2,
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           }}>
             <div>
-              <h3 style={{ margin: '0 0 5px 0', fontSize: '1.2rem', color: '#111827' }}>{guest.fullName}</h3>
-              <p style={{ margin: 0, color: '#6b7280', fontSize: '0.9rem' }}>Khu vực: <strong>{guest.zone}</strong></p>
-              {guest.docId && <p style={{ margin: '5px 0 0 0', color: '#9ca3af', fontSize: '0.85rem' }}>ID: {guest.docId}</p>}
-              <div style={{ marginTop: '5px' }}>{renderSyncBadge(queueByGuest?.get(guest.id))}</div>
+              <h3 style={{ fontSize: 17, marginBottom: 5 }}>{guest.fullName}</h3>
+              <p style={{ margin: 0, color: 'var(--text-2)', fontSize: 14 }}>Khu vực: <strong>{guest.zone}</strong></p>
+              {guest.docId && <p style={{ margin: '5px 0 0 0', color: 'var(--text-3)', fontSize: 13 }}>ID: {guest.docId}</p>}
+              <div style={{ marginTop: 5 }}>{renderSyncBadge(queueByGuest?.get(guest.id))}</div>
             </div>
 
             <button
               onClick={() => handleCheckIn(guest)}
               disabled={guest.status === 'CHECKED_IN'}
-              style={{
-                background: guest.status === 'CHECKED_IN' ? '#dcfce7' : '#2563eb',
-                color: guest.status === 'CHECKED_IN' ? '#16a34a' : 'white',
-                border: 'none', padding: '10px 15px', borderRadius: '8px', fontWeight: 'bold', cursor: guest.status === 'CHECKED_IN' ? 'not-allowed' : 'pointer',
-                display: 'flex', alignItems: 'center', gap: '8px'
-              }}
+              className={guest.status === 'CHECKED_IN' ? 'btn' : 'btn btn-primary'}
+              style={guest.status === 'CHECKED_IN' ? { background: 'var(--success-bg)', color: 'var(--success)' } : undefined}
             >
               {guest.status === 'CHECKED_IN' ? <><UserCheck size={18} /> Đã vào</> : 'Check-in'}
             </button>

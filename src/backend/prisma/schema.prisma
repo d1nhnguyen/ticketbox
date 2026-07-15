@@ -78,6 +78,7 @@ model Concert {
   artistBio    String?       @db.Text
   artists      String[]      @default([])
   bioSourceUrl String?
+  imageUrl     String?
   seatMapSvg   String?       @db.Text
   createdAt    DateTime      @default(now())
 

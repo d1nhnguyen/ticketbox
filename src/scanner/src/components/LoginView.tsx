@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import axios from 'axios';
-import { LogIn, WifiOff } from 'lucide-react';
+import { LogIn, WifiOff, Ticket } from 'lucide-react';
 import { login } from '../services/api';
 import { decodeJwt, setToken } from '../services/session';
 
@@ -57,26 +57,25 @@ export default function LoginView({ onLoggedIn }: Props) {
     }
   };
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '14px', boxSizing: 'border-box', borderRadius: '8px',
-    border: '1.5px solid #d1d5db', fontSize: '1rem', outline: 'none', marginBottom: '12px',
-  };
-
   return (
-    <div style={{ minHeight: '100vh', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui, sans-serif', padding: '20px' }}>
-      <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', padding: '30px', width: '100%', maxWidth: '380px' }}>
-        <h1 style={{ margin: '0 0 6px 0', fontSize: '1.4rem', color: '#111827', fontWeight: 800, textAlign: 'center' }}>🎫 TB Scanner</h1>
-        <p style={{ margin: '0 0 20px 0', color: '#6b7280', textAlign: 'center', fontSize: '0.9rem' }}>Đăng nhập bằng tài khoản soát vé</p>
+    <div className="scan-shell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div className="card" style={{ padding: 30, width: '100%', maxWidth: 380 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 6 }}>
+          <Ticket size={22} color="var(--primary)" />
+          <h1 style={{ fontSize: 20 }}>TB Scanner</h1>
+        </div>
+        <p style={{ textAlign: 'center', color: 'var(--text-2)', fontSize: 14, marginBottom: 20 }}>Đăng nhập bằng tài khoản soát vé</p>
 
         {!isOnline && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: '8px', padding: '10px 12px', marginBottom: '15px', fontSize: '0.9rem' }}>
+          <div className="alert alert-danger" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 15 }}>
             <WifiOff size={18} /> Cần kết nối mạng để đăng nhập.
           </div>
         )}
 
         <form onSubmit={handleSubmit}>
           <input
-            style={inputStyle}
+            className="input"
+            style={{ marginBottom: 12 }}
             type="email"
             placeholder="Email"
             value={email}
@@ -85,7 +84,8 @@ export default function LoginView({ onLoggedIn }: Props) {
             required
           />
           <input
-            style={inputStyle}
+            className="input"
+            style={{ marginBottom: 12 }}
             type="password"
             placeholder="Mật khẩu"
             value={password}
@@ -94,20 +94,9 @@ export default function LoginView({ onLoggedIn }: Props) {
             required
           />
 
-          {error && (
-            <p style={{ color: '#dc2626', fontSize: '0.9rem', margin: '0 0 12px 0' }}>{error}</p>
-          )}
+          {error && <p style={{ color: 'var(--danger)', fontSize: 13, margin: '0 0 12px 0' }}>{error}</p>}
 
-          <button
-            type="submit"
-            disabled={!isOnline || submitting}
-            style={{
-              width: '100%', padding: '14px', borderRadius: '8px', border: 'none',
-              background: (!isOnline || submitting) ? '#9ca3af' : '#2563eb', color: 'white',
-              fontSize: '1rem', fontWeight: 700, cursor: (!isOnline || submitting) ? 'not-allowed' : 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-            }}
-          >
+          <button type="submit" className="btn btn-primary btn-block" disabled={!isOnline || submitting}>
             <LogIn size={18} /> {submitting ? 'Đang đăng nhập...' : 'Đăng nhập'}
           </button>
         </form>

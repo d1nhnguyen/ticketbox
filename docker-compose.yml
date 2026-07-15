@@ -60,8 +60,10 @@ services:
     container_name: ticketbox_backend
     ports:
       - "3000:3000"
+    env_file:
+      - ./src/backend/.env
     environment:
-      # Docker values point to service names; optional integrations come from root .env.
+      # Ghi đè các giá trị trong .env để trỏ vào các container trong mạng Docker
       DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/ticketbox?schema=public
       REDIS_URL: redis://redis:6379
       JWT_SECRET: supersecret_dev
