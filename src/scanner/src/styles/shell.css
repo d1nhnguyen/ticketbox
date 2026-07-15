@@ -1,0 +1,89 @@
+.scan-shell {
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+.scan-header {
+  background: var(--surface);
+  padding: 12px 20px;
+  box-shadow: var(--shadow-xs);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.scan-main {
+  padding-bottom: 24px;
+}
+
+/* Nav: bottom tab bar on phones, left rail on desktop */
+.scan-nav {
+  position: fixed;
+  z-index: 20;
+  background: var(--surface);
+  display: flex;
+  border-top: 1px solid var(--border);
+}
+
+.scan-nav-btn {
+  flex: 1;
+  border: none;
+  background: none;
+  color: var(--text-2);
+  font-weight: 500;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.scan-nav-btn.active {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+/* Mobile: bottom tab bar */
+@media (max-width: 767px) {
+  .scan-nav {
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: var(--tabbar-h);
+    border-right: none;
+    flex-direction: row;
+  }
+  .scan-main {
+    padding-bottom: calc(var(--tabbar-h) + 12px);
+  }
+}
+
+/* Desktop: left rail */
+@media (min-width: 768px) {
+  .scan-nav {
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: var(--rail-w);
+    border-top: none;
+    border-right: 1px solid var(--border);
+    flex-direction: column;
+    padding-top: 16px;
+    gap: 4px;
+  }
+  .scan-nav-btn {
+    flex: none;
+    padding: 14px 8px;
+  }
+  .scan-header {
+    margin-left: var(--rail-w);
+  }
+  .scan-main {
+    margin-left: var(--rail-w);
+  }
+}

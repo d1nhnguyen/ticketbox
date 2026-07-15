@@ -3,7 +3,7 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { db } from '../db/db';
 import { getDeviceId } from '../services/session';
 import { syncPendingRecords } from '../services/syncEngine';
-import { CheckCircle2, XCircle, AlertTriangle, ClipboardPaste, Keyboard } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertTriangle, ClipboardPaste, Keyboard, ScanLine } from 'lucide-react';
 
 interface Props {
   concertId: string;
@@ -63,7 +63,7 @@ export default function ScannerTab({ concertId }: Props) {
         syncStatus: 'PENDING',
       });
 
-      setScanResult({ status: 'SUCCESS', message: `✅ Thành công! Vé đã được ghi nhận.` });
+      setScanResult({ status: 'SUCCESS', message: `Thành công! Vé đã được ghi nhận.` });
       void syncPendingRecords();
     } catch (err) {
       console.error(err);
@@ -193,62 +193,54 @@ export default function ScannerTab({ concertId }: Props) {
     setIsManualLoading(false);
   };
 
-  // ---- Styles ----
-  const resultBg = scanResult.status === 'SUCCESS' ? '#dcfce7' : scanResult.status === 'ERROR' ? '#fee2e2' : '#fef9c3';
-  const resultBorder = scanResult.status === 'SUCCESS' ? '#22c55e' : scanResult.status === 'ERROR' ? '#ef4444' : '#eab308';
-  const resultColor = scanResult.status === 'SUCCESS' ? '#166534' : scanResult.status === 'ERROR' ? '#991b1b' : '#854d0e';
+  const resultAlertClass =
+    scanResult.status === 'SUCCESS' ? 'alert-success' :
+      scanResult.status === 'ERROR' ? 'alert-danger' : 'alert-warning';
 
   return (
-    <div style={{ padding: '20px', maxWidth: '500px', margin: '0 auto' }}>
-      <h2 style={{ fontSize: '1.5rem', marginBottom: '20px', textAlign: 'center' }}>📷 Quét Mã QR</h2>
+    <div style={{ padding: 20, maxWidth: 500, margin: '0 auto' }}>
+      <h2 style={{ fontSize: 20, marginBottom: 20, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+        <ScanLine size={22} color="var(--primary)" /> Quét Mã QR
+      </h2>
 
       {/* ---- Clipboard paste button ---- */}
-      <div style={{ marginBottom: '12px' }}>
+      <div style={{ marginBottom: 12 }}>
         <button
           onClick={handlePasteFromClipboard}
           disabled={isPasteLoading}
+          className="btn btn-block"
           style={{
-            width: '100%', padding: '14px', borderRadius: '10px', border: '2px dashed #6366f1',
-            background: isPasteLoading ? '#e0e7ff' : '#eef2ff', color: '#4338ca',
-            fontSize: '1rem', fontWeight: 700, cursor: isPasteLoading ? 'not-allowed' : 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+            border: '2px dashed var(--accent)', borderRadius: 'var(--radius-md)',
+            background: isPasteLoading ? 'var(--primary-soft-border)' : 'var(--primary-soft)', color: 'var(--accent)',
           }}
         >
           <ClipboardPaste size={20} />
           {isPasteLoading ? 'Đang đọc clipboard...' : 'Dán QR từ Clipboard (Ctrl+C ảnh → bấm đây)'}
         </button>
-        <p style={{ margin: '6px 0 0 4px', color: '#6b7280', fontSize: '0.78rem' }}>
+        <p style={{ margin: '6px 0 0 4px', color: 'var(--text-3)', fontSize: 12 }}>
           Chụp màn hình QR → copy → paste vào đây. Hoặc copy text mã vé cũng được.
         </p>
       </div>
 
       {/* ---- Manual text input ---- */}
-      <div style={{ marginBottom: '16px' }}>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <div style={{ position: 'relative', flex: 1 }}>
-            <Keyboard size={16} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+            <Keyboard size={16} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-3)' }} />
             <input
               type="text"
               value={manualCode}
               onChange={(e) => setManualCode(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') void handleManualSubmit(); }}
               placeholder="Dán / nhập mã vé thủ công rồi Enter..."
-              style={{
-                width: '100%', padding: '12px 12px 12px 34px', boxSizing: 'border-box',
-                borderRadius: '8px', border: '1.5px solid #d1d5db', fontSize: '0.9rem',
-              }}
+              className="input"
+              style={{ paddingLeft: 34 }}
             />
           </div>
           <button
             onClick={handleManualSubmit}
             disabled={isManualLoading || !manualCode.trim()}
-            style={{
-              padding: '12px 18px', borderRadius: '8px', border: 'none',
-              background: (!manualCode.trim() || isManualLoading) ? '#9ca3af' : '#16a34a',
-              color: 'white', fontWeight: 700, fontSize: '0.95rem',
-              cursor: (!manualCode.trim() || isManualLoading) ? 'not-allowed' : 'pointer',
-              whiteSpace: 'nowrap',
-            }}
+            className="btn btn-success"
           >
             {isManualLoading ? '...' : 'Kiểm tra'}
           </button>
@@ -256,47 +248,36 @@ export default function ScannerTab({ concertId }: Props) {
       </div>
 
       {/* Divider */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-        <div style={{ flex: 1, height: '1px', background: '#e5e7eb' }} />
-        <span style={{ color: '#9ca3af', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>hoặc dùng Camera</span>
-        <div style={{ flex: 1, height: '1px', background: '#e5e7eb' }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+        <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+        <span style={{ color: 'var(--text-3)', fontSize: 13, whiteSpace: 'nowrap' }}>hoặc dùng Camera</span>
+        <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
       </div>
 
       {/* ---- Camera ---- */}
       {!isScanning ? (
-        <button
-          onClick={startScanner}
-          style={{ width: '100%', padding: '15px', background: '#2563eb', color: 'white', borderRadius: '8px', fontSize: '1.1rem', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}
-        >
+        <button onClick={startScanner} className="btn btn-primary btn-block" style={{ padding: 15, fontSize: 16 }}>
           Mở Camera
         </button>
       ) : (
-        <button
-          onClick={stopScanner}
-          style={{ width: '100%', padding: '15px', background: '#ef4444', color: 'white', borderRadius: '8px', fontSize: '1.1rem', fontWeight: 'bold', border: 'none', cursor: 'pointer', marginBottom: '20px' }}
-        >
+        <button onClick={stopScanner} className="btn btn-danger btn-block" style={{ padding: 15, fontSize: 16, marginBottom: 20 }}>
           Đóng Camera
         </button>
       )}
 
       {/* Vùng render camera */}
-      <div id="reader" style={{ width: '100%', marginTop: '12px', borderRadius: '12px', overflow: 'hidden', border: isScanning ? '2px solid #2563eb' : 'none' }} />
+      <div id="reader" style={{ width: '100%', marginTop: 12, borderRadius: 'var(--radius-lg)', overflow: 'hidden', border: isScanning ? '2px solid var(--primary)' : 'none' }} />
 
       {/* Hidden div dùng để decode ảnh clipboard — không hiện ra ngoài */}
       <div id="clipboard-decoder" style={{ display: 'none' }} />
 
       {/* ---- Kết quả ---- */}
       {scanResult.status !== 'IDLE' && (
-        <div style={{
-          marginTop: '20px', padding: '20px', borderRadius: '12px', textAlign: 'center',
-          background: resultBg, border: `2px solid ${resultBorder}`,
-        }}>
-          {scanResult.status === 'SUCCESS' && <CheckCircle2 size={40} color="#16a34a" style={{ margin: '0 auto' }} />}
-          {scanResult.status === 'ERROR'   && <XCircle size={40} color="#dc2626" style={{ margin: '0 auto' }} />}
-          {scanResult.status === 'CONFLICT' && <AlertTriangle size={40} color="#ca8a04" style={{ margin: '0 auto' }} />}
-          <h3 style={{ marginTop: '10px', fontSize: '1.1rem', color: resultColor }}>
-            {scanResult.message}
-          </h3>
+        <div className={`alert ${resultAlertClass}`} style={{ marginTop: 20, padding: 20, textAlign: 'center' }}>
+          {scanResult.status === 'SUCCESS' && <CheckCircle2 size={40} color="var(--success)" style={{ margin: '0 auto' }} />}
+          {scanResult.status === 'ERROR' && <XCircle size={40} color="var(--danger)" style={{ margin: '0 auto' }} />}
+          {scanResult.status === 'CONFLICT' && <AlertTriangle size={40} color="var(--warning)" style={{ margin: '0 auto' }} />}
+          <h3 style={{ marginTop: 10, fontSize: 16 }}>{scanResult.message}</h3>
         </div>
       )}
     </div>

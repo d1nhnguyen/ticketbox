@@ -15,7 +15,7 @@ export default defineConfig({
         name: 'TicketBox Scanner',
         short_name: 'TB Scanner',
         description: 'Offline-first QR Scanner for TicketBox',
-        theme_color: '#2563eb',
+        theme_color: '#4f46e5',
         background_color: '#ffffff',
         display: 'standalone',
         start_url: '/',

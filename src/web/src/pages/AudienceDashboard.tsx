@@ -4,6 +4,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../hooks/useAuth';
 import { Navigate } from 'react-router-dom';
 import { usePaymentMethods } from '../hooks/usePaymentMethods';
+import { X, Ticket, ShoppingCart, AlertTriangle } from 'lucide-react';
 
 export default function AudienceDashboard() {
   const { token, role } = useAuth();
@@ -71,94 +72,43 @@ export default function AudienceDashboard() {
     );
 
   const getStatusBadge = (status: string) => {
-    let bg = '#e2e8f0';
-    let color = '#475569';
-    let text = status;
-
-    if (status === 'PAID') {
-      bg = '#dcfce7';
-      color = '#16a34a';
-      text = 'Đã thanh toán';
-    } else if (status === 'PENDING') {
-      bg = '#fef3c7';
-      color = '#d97706';
-      text = 'Chờ thanh toán';
-    } else if (status === 'EXPIRED') {
-      bg = '#f1f5f9';
-      color = '#94a3b8';
-      text = 'Đã hết hạn';
-    } else if (status === 'FAILED') {
-      bg = '#fee2e2';
-      color = '#dc2626';
-      text = 'Thất bại';
-    }
-
-    return (
-      <span style={{
-        background: bg,
-        color: color,
-        padding: '5px 12px',
-        borderRadius: '20px',
-        fontSize: '0.85rem',
-        fontWeight: 'bold'
-      }}>
-        {text}
-      </span>
-    );
+    if (status === 'PAID') return <span className="badge badge-success">Đã thanh toán</span>;
+    if (status === 'PENDING') return <span className="badge badge-warning">Chờ thanh toán</span>;
+    if (status === 'EXPIRED') return <span className="badge badge-muted">Đã hết hạn</span>;
+    if (status === 'FAILED') return <span className="badge badge-danger">Thất bại</span>;
+    return <span className="badge badge-muted">{status}</span>;
   };
 
   return (
-    <div style={{ maxWidth: '1000px', margin: '40px auto', padding: '0 20px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-      <h1 style={{ fontSize: '2.2rem', marginBottom: '8px', color: '#0f172a' }}>🎟️ Trang cá nhân của tôi</h1>
-      <p style={{ color: '#64748b', marginBottom: '30px' }}>Quản lý vé xem concert và lịch sử thanh toán đơn hàng.</p>
+    <div>
+      <div className="page-header">
+        <div>
+          <div className="page-title">Trang cá nhân của tôi</div>
+          <div className="page-subtitle">Quản lý vé xem concert và lịch sử thanh toán đơn hàng.</div>
+        </div>
+      </div>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: '10px', borderBottom: '2px solid #e2e8f0', marginBottom: '30px' }}>
-        <button
-          onClick={() => setActiveTab('tickets')}
-          style={{
-            padding: '12px 24px',
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'tickets' ? '3px solid #2563eb' : '3px solid transparent',
-            color: activeTab === 'tickets' ? '#2563eb' : '#64748b',
-            fontWeight: 'bold',
-            fontSize: '1.1rem',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            marginBottom: '-2px'
-          }}
-        >
+      <div className="tabs">
+        <button className={`tab${activeTab === 'tickets' ? ' active' : ''}`} onClick={() => setActiveTab('tickets')}>
           Vé của tôi ({paidTickets.length})
         </button>
-        <button
-          onClick={() => setActiveTab('history')}
-          style={{
-            padding: '12px 24px',
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'history' ? '3px solid #2563eb' : '3px solid transparent',
-            color: activeTab === 'history' ? '#2563eb' : '#64748b',
-            fontWeight: 'bold',
-            fontSize: '1.1rem',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            marginBottom: '-2px'
-          }}
-        >
+        <button className={`tab${activeTab === 'history' ? ' active' : ''}`} onClick={() => setActiveTab('history')}>
           Lịch sử giao dịch ({orders.length})
         </button>
       </div>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>Đang tải dữ liệu...</div>
+        <div className="empty-state">
+          <div className="spinner" style={{ margin: '0 auto 12px' }} />
+          Đang tải dữ liệu...
+        </div>
       ) : (
         <div>
           {/* Tab 1: Vé của tôi */}
           {activeTab === 'tickets' && (
             <div>
               {paidTickets.length > 0 ? (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
+                <div className="grid-cards">
                   {paidTickets.map((ticket: any) => (
                     <div
                       key={ticket.id}
@@ -170,51 +120,42 @@ export default function AudienceDashboard() {
                       style={{
                         background: 'linear-gradient(135deg, #1e1b4b 0%, #3b0764 100%)',
                         color: 'white',
-                        borderRadius: '16px',
+                        borderRadius: 'var(--radius-lg)',
                         overflow: 'hidden',
                         cursor: 'pointer',
-                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                        boxShadow: 'var(--shadow-md)',
                         display: 'flex',
                         flexDirection: 'column',
-                        transition: 'transform 0.2s, box-shadow 0.2s',
-                        border: '1px solid rgba(255, 255, 255, 0.1)'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-4px)';
-                        e.currentTarget.style.boxShadow = '0 20px 25px -5px rgba(0, 0, 0, 0.2)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'none';
-                        e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)';
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
                       }}
                     >
-                      <div style={{ padding: '20px', flexGrow: 1 }}>
+                      <div style={{ padding: 20, flexGrow: 1 }}>
                         <span style={{
-                          fontSize: '0.75rem',
+                          fontSize: 12,
                           background: 'rgba(255, 255, 255, 0.15)',
                           padding: '4px 10px',
-                          borderRadius: '20px',
+                          borderRadius: 'var(--radius-full)',
                           textTransform: 'uppercase',
-                          fontWeight: 'bold',
+                          fontWeight: 700,
                           letterSpacing: '0.5px'
                         }}>
                           TICKETBOX PASS
                         </span>
-                        <h3 style={{ fontSize: '1.3rem', margin: '15px 0 5px 0', fontWeight: 'bold', lineHeight: '1.4' }}>
+                        <h3 style={{ fontSize: 20, color: 'white', margin: '15px 0 5px 0', lineHeight: 1.4 }}>
                           {ticket.concert?.title}
                         </h3>
-                        <p style={{ fontSize: '0.85rem', margin: '0 0 15px 0', opacity: 0.8 }}>
+                        <p style={{ fontSize: 13, margin: '0 0 15px 0', opacity: 0.8 }}>
                           {ticket.concert?.venue}
                         </p>
 
-                        <div style={{ borderTop: '1px dashed rgba(255, 255, 255, 0.2)', paddingTop: '15px', display: 'flex', justifyContent: 'space-between' }}>
+                        <div style={{ borderTop: '1px dashed rgba(255, 255, 255, 0.2)', paddingTop: 15, display: 'flex', justifyContent: 'space-between' }}>
                           <div>
-                            <span style={{ fontSize: '0.75rem', opacity: 0.6, display: 'block' }}>Hạng ghế</span>
-                            <span style={{ fontWeight: 'bold', color: '#38bdf8', fontSize: '1.1rem' }}>{ticket.ticketType?.name}</span>
+                            <span style={{ fontSize: 12, opacity: 0.6, display: 'block' }}>Hạng ghế</span>
+                            <span style={{ fontWeight: 700, color: '#38bdf8', fontSize: 17 }}>{ticket.ticketType?.name}</span>
                           </div>
                           <div style={{ textAlign: 'right' }}>
-                            <span style={{ fontSize: '0.75rem', opacity: 0.6, display: 'block' }}>Thời gian</span>
-                            <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>
+                            <span style={{ fontSize: 12, opacity: 0.6, display: 'block' }}>Thời gian</span>
+                            <span style={{ fontWeight: 700, fontSize: 14 }}>
                               {ticket.concert?.startsAt ? new Date(ticket.concert.startsAt).toLocaleDateString('vi-VN') : '—'}
                             </span>
                           </div>
@@ -223,26 +164,26 @@ export default function AudienceDashboard() {
 
                       {/* Phía dưới mô phỏng răng cưa */}
                       <div style={{
-                        background: '#ffffff',
+                        background: 'var(--surface)',
                         padding: '12px 20px',
-                        color: '#4b5563',
-                        fontSize: '0.85rem',
-                        fontWeight: 'bold',
+                        color: 'var(--text-2)',
+                        fontSize: 13,
+                        fontWeight: 700,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        borderTop: '2px dashed #f3f4f6'
+                        borderTop: '2px dashed var(--border)',
                       }}>
-                        <span style={{ color: '#2563eb' }}>Xem mã QR →</span>
+                        <span style={{ color: 'var(--primary)' }}>Xem mã QR →</span>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div style={{ padding: '60px 20px', textAlign: 'center', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                  <span style={{ fontSize: '3rem' }}>🎟️</span>
-                  <h3 style={{ color: '#1e293b', marginTop: '15px' }}>Bạn chưa sở hữu vé nào</h3>
-                  <p style={{ color: '#64748b', marginTop: '5px' }}>Hãy chọn và đặt mua vé ở trang chủ ngay thôi!</p>
+                <div className="empty-state">
+                  <Ticket className="empty-state-icon" />
+                  <h3 style={{ color: 'var(--text)', marginTop: 15 }}>Bạn chưa sở hữu vé nào</h3>
+                  <p style={{ marginTop: 5 }}>Hãy chọn và đặt mua vé ở trang chủ ngay thôi!</p>
                 </div>
               )}
             </div>
@@ -250,18 +191,18 @@ export default function AudienceDashboard() {
 
           {/* Tab 2: Lịch sử giao dịch */}
           {activeTab === 'history' && (
-            <div style={{ background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+            <div>
               {orders.length > 0 ? (
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <div className="table-wrap">
+                  <table className="table">
                     <thead>
-                      <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                        <th style={{ padding: '15px 20px', color: '#475569', fontWeight: 600 }}>Mã đơn hàng</th>
-                        <th style={{ padding: '15px 20px', color: '#475569', fontWeight: 600 }}>Concert</th>
-                        <th style={{ padding: '15px 20px', color: '#475569', fontWeight: 600 }}>Chi tiết vé</th>
-                        <th style={{ padding: '15px 20px', color: '#475569', fontWeight: 600 }}>Tổng tiền</th>
-                        <th style={{ padding: '15px 20px', color: '#475569', fontWeight: 600 }}>Trạng thái</th>
-                        <th style={{ padding: '15px 20px', color: '#475569', fontWeight: 600 }}>Thao tác</th>
+                      <tr>
+                        <th>Mã đơn hàng</th>
+                        <th>Concert</th>
+                        <th>Chi tiết vé</th>
+                        <th>Tổng tiền</th>
+                        <th>Trạng thái</th>
+                        <th>Thao tác</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -271,68 +212,44 @@ export default function AudienceDashboard() {
                           ? `${firstItem.ticketType?.name || 'Vé'} x ${firstItem.quantity}`
                           : '—';
                         return (
-                          <tr key={order.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                            <td style={{ padding: '15px 20px', fontFamily: 'monospace', color: '#334155', fontSize: '0.9rem' }}>
+                          <tr key={order.id}>
+                            <td style={{ fontFamily: 'monospace', fontSize: 13 }}>
                               {order.id.substring(0, 13)}...
                             </td>
-                            <td style={{ padding: '15px 20px', fontWeight: 'bold', color: '#0f172a' }}>
+                            <td style={{ fontWeight: 700 }}>
                               {order.concert?.title || 'Sự kiện'}
                             </td>
-                            <td style={{ padding: '15px 20px', color: '#4b5563' }}>
-                              {detailsText}
-                            </td>
-                            <td style={{ padding: '15px 20px', fontWeight: 'bold', color: '#0f172a' }}>
+                            <td>{detailsText}</td>
+                            <td style={{ fontWeight: 700 }}>
                               {order.totalAmount.toLocaleString('vi-VN')} VNĐ
                             </td>
-                            <td style={{ padding: '15px 20px' }}>
-                              {getStatusBadge(order.status)}
-                            </td>
-                            <td style={{ padding: '15px 20px' }}>
+                            <td>{getStatusBadge(order.status)}</td>
+                            <td>
                               {order.status === 'PENDING' && (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                   {vnpayEnabled && (
                                     <button
+                                      className="btn btn-primary btn-sm"
                                       onClick={() => handlePayment(order, 'VNPAY')}
                                       disabled={payingOrderId === order.id}
-                                      style={{
-                                        background: '#2563eb',
-                                        color: 'white',
-                                        padding: '6px 14px',
-                                        border: 'none',
-                                        borderRadius: '6px',
-                                        fontWeight: 'bold',
-                                        cursor: payingOrderId === order.id ? 'not-allowed' : 'pointer',
-                                        fontSize: '0.85rem',
-                                        opacity: payingOrderId === order.id ? 0.7 : 1
-                                      }}
                                     >
                                       {payingOrderId === order.id ? 'Đang tải...' : 'Thanh toán (VNPay)'}
                                     </button>
                                   )}
                                   <button
+                                    className="btn btn-secondary btn-sm"
                                     onClick={() => handlePayment(order, 'MOCK')}
                                     disabled={payingOrderId === order.id}
-                                    style={{
-                                      background: '#475569',
-                                      color: 'white',
-                                      padding: '6px 14px',
-                                      border: 'none',
-                                      borderRadius: '6px',
-                                      fontWeight: 'bold',
-                                      cursor: payingOrderId === order.id ? 'not-allowed' : 'pointer',
-                                      fontSize: '0.85rem',
-                                      opacity: payingOrderId === order.id ? 0.7 : 1
-                                    }}
                                   >
                                     Thanh toán (Mock)
                                   </button>
                                 </div>
                               )}
                               {order.status === 'PAID' && (
-                                <span style={{ color: '#16a34a', fontWeight: 'bold', fontSize: '0.85rem' }}>✓ Hoàn tất</span>
+                                <span style={{ color: 'var(--success)', fontWeight: 700, fontSize: 13 }}>✓ Hoàn tất</span>
                               )}
                               {order.status !== 'PAID' && order.status !== 'PENDING' && (
-                                <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>—</span>
+                                <span style={{ color: 'var(--text-3)', fontSize: 13 }}>—</span>
                               )}
                             </td>
                           </tr>
@@ -342,9 +259,9 @@ export default function AudienceDashboard() {
                   </table>
                 </div>
               ) : (
-                <div style={{ padding: '60px 20px', textAlign: 'center', color: '#64748b' }}>
-                  <p style={{ fontSize: '3rem', marginBottom: '10px' }}>🛒</p>
-                  <p>Bạn chưa thực hiện giao dịch nào.</p>
+                <div className="empty-state">
+                  <ShoppingCart className="empty-state-icon" />
+                  Bạn chưa thực hiện giao dịch nào.
                 </div>
               )}
             </div>
@@ -354,79 +271,38 @@ export default function AudienceDashboard() {
 
       {/* Modal hiển thị QR Code */}
       {selectedQr && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(15, 23, 42, 0.8)',
-          backdropFilter: 'blur(8px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: '20px'
-        }} onClick={() => setSelectedQr(null)}>
-          <div style={{
-            background: 'white',
-            borderRadius: '24px',
-            padding: '40px',
-            maxWidth: '400px',
-            width: '100%',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
-            textAlign: 'center',
-            border: '1px solid #e2e8f0',
-            position: 'relative'
-          }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-backdrop" onClick={() => setSelectedQr(null)}>
+          <div className="modal" style={{ maxWidth: 400, padding: 40, textAlign: 'center', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
             <button
+              className="btn btn-ghost btn-sm"
               onClick={() => setSelectedQr(null)}
-              style={{
-                position: 'absolute',
-                top: '20px',
-                right: '20px',
-                background: '#f1f5f9',
-                border: 'none',
-                width: '32px',
-                height: '32px',
-                borderRadius: '50%',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
+              style={{ position: 'absolute', top: 16, right: 16, width: 32, height: 32, borderRadius: '50%', padding: 0 }}
             >
-              ✕
+              <X size={16} />
             </button>
-            <h3 style={{ fontSize: '1.4rem', color: '#0f172a', margin: '0 0 5px 0' }}>Vé soát cửa của bạn</h3>
-            <p style={{ color: '#38bdf8', fontWeight: 'bold', fontSize: '1.1rem', margin: '0 0 8px 0', textTransform: 'uppercase' }}>
+            <h3 style={{ fontSize: 20, margin: '0 0 5px 0' }}>Vé soát cửa của bạn</h3>
+            <p style={{ color: 'var(--primary)', fontWeight: 700, fontSize: 17, margin: '0 0 8px 0', textTransform: 'uppercase' }}>
               {selectedQr.type}
             </p>
-            <p style={{ color: '#64748b', fontSize: '0.9rem', margin: '0 0 25px 0' }}>
+            <p style={{ color: 'var(--text-2)', fontSize: 14, margin: '0 0 25px 0' }}>
               {selectedQr.title}
             </p>
 
             <div style={{
-              background: '#f8fafc',
-              padding: '20px',
-              borderRadius: '16px',
-              border: '2px solid #e2e8f0',
+              background: 'var(--surface-2)',
+              padding: 20,
+              borderRadius: 'var(--radius-lg)',
+              border: '2px solid var(--border)',
               display: 'inline-block',
-              marginBottom: '20px'
+              marginBottom: 20
             }}>
-              <QRCodeSVG
-                value={selectedQr.code}
-                size={220}
-                level="H"
-                includeMargin={true}
-              />
+              <QRCodeSVG value={selectedQr.code} size={220} level="H" includeMargin={true} />
             </div>
 
-            <p style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 'bold', margin: '0 0 5px 0' }}>
-              ⚠️ CẢNH BÁO BẢO MẬT
+            <p style={{ fontSize: 13, color: 'var(--danger)', fontWeight: 700, margin: '0 0 5px 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <AlertTriangle size={14} /> CẢNH BÁO BẢO MẬT
             </p>
-            <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0, lineHeight: '1.4' }}>
+            <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0, lineHeight: 1.4 }}>
               Không chia sẻ mã QR này với bất kỳ ai để tránh bị quét vé giả hoặc mất quyền check-in.
             </p>
           </div>

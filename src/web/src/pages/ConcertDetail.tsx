@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { ChevronLeft, Sparkles, AlertTriangle } from 'lucide-react';
 import apiClient from '../api/client';
 import { QRCodeSVG } from 'qrcode.react';
 import DOMPurify from 'dompurify';
@@ -214,33 +215,33 @@ export default function ConcertDetail() {
     }
   };
 
-  if (loading) return <div style={{ padding: '50px', textAlign: 'center', fontSize: '1.2rem' }}>⏳ Đang tải dữ liệu thực tế...</div>;
-  if (!concert) return <div style={{ padding: '50px', textAlign: 'center', color: 'red' }}>Không tìm thấy Concert!</div>;
+  if (loading) return (
+    <div className="empty-state">
+      <div className="spinner" style={{ margin: '0 auto 12px' }} />
+      Đang tải dữ liệu...
+    </div>
+  );
+  if (!concert) return <div className="alert alert-danger">Không tìm thấy Concert!</div>;
 
   // Hiển thị banner hủy concert trước khi render nội dung mua vé
   if (concert.status === 'CANCELLED') {
     return (
-      <div style={{ maxWidth: '800px', margin: '40px auto', padding: '20px' }}>
-        <Link to="/" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 'bold' }}>← Quay lại danh sách</Link>
-        <div style={{
-          marginTop: '30px',
-          background: '#fef2f2',
-          border: '2px solid #ef4444',
-          borderRadius: '12px',
-          padding: '40px',
-          textAlign: 'center',
-        }}>
-          <div style={{ fontSize: '4rem', marginBottom: '16px' }}></div>
-          <h1 style={{ fontSize: '2rem', color: '#b91c1c', marginBottom: '12px' }}>Sự kiện đã bị hủy</h1>
-          <h2 style={{ fontSize: '1.3rem', color: '#374151', marginBottom: '12px' }}>{concert.title}</h2>
-          <p style={{ color: '#6b7280', fontSize: '1rem', marginBottom: '8px' }}>
+      <div style={{ maxWidth: 800, margin: '0 auto' }}>
+        <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--primary)', fontWeight: 600 }}>
+          <ChevronLeft size={16} /> Quay lại danh sách
+        </Link>
+        <div className="card" style={{ marginTop: 24, padding: 40, textAlign: 'center', borderColor: 'var(--danger-border)' }}>
+          <AlertTriangle size={48} style={{ color: 'var(--danger)', margin: '0 auto 16px' }} />
+          <h1 style={{ fontSize: 26, color: 'var(--danger)', marginBottom: 12 }}>Sự kiện đã bị hủy</h1>
+          <h2 style={{ fontSize: 19, marginBottom: 12 }}>{concert.title}</h2>
+          <p style={{ color: 'var(--text-2)', marginBottom: 8 }}>
             {concert.venue} &nbsp;|&nbsp; {new Date(concert.startsAt).toLocaleString('vi-VN')}
           </p>
-          <p style={{ color: '#dc2626', fontWeight: 600, marginTop: '20px', fontSize: '1rem' }}>
+          <p style={{ color: 'var(--danger)', fontWeight: 600, marginTop: 20 }}>
             Sự kiện này đã bị hủy bởi Ban tổ chức. Vé của bạn (nếu đã mua) sẽ được hoàn tiền trong thời gian sớm nhất.
           </p>
-          <p style={{ color: '#6b7280', marginTop: '12px', fontSize: '0.9rem' }}>
-            Vui lòng kiểm tra hộp thư <Link to="/notifications" style={{ color: '#2563eb' }}>Thông báo</Link> để biết thêm chi tiết.
+          <p style={{ color: 'var(--text-2)', marginTop: 12, fontSize: 14 }}>
+            Vui lòng kiểm tra hộp thư <Link to="/notifications">Thông báo</Link> để biết thêm chi tiết.
           </p>
         </div>
       </div>
@@ -249,84 +250,71 @@ export default function ConcertDetail() {
 
   if (issuedTickets.length > 0) {
     return (
-      <div style={{ maxWidth: '700px', margin: '40px auto', padding: '20px', textAlign: 'center' }}>
-        <h1 style={{ fontSize: '2rem', marginBottom: '10px' }}>Thanh toán thành công!</h1>
-        <p style={{ color: '#4b5563', marginBottom: '24px' }}>Vui lòng xuất trình mã QR dưới đây tại cổng sự kiện.</p>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px', justifyContent: 'center' }}>
+      <div style={{ maxWidth: 700, margin: '0 auto', textAlign: 'center' }}>
+        <h1 style={{ fontSize: 26, marginBottom: 10 }}>Thanh toán thành công!</h1>
+        <p style={{ color: 'var(--text-2)', marginBottom: 24 }}>Vui lòng xuất trình mã QR dưới đây tại cổng sự kiện.</p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24, justifyContent: 'center' }}>
           {issuedTickets.map((ticket) => (
-            <div key={ticket.id} style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
+            <div key={ticket.id} className="card" style={{ padding: 20 }}>
               <QRCodeSVG value={ticket.qrCode} size={180} />
-              <div style={{ marginTop: '10px', fontSize: '12px', color: '#6b7280' }}>{ticket.qrCode}</div>
+              <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text-3)' }}>{ticket.qrCode}</div>
             </div>
           ))}
         </div>
-        <Link to="/" style={{ display: 'inline-block', marginTop: '24px', color: '#2563eb', fontWeight: 'bold' }}>← Về trang chủ</Link>
+        <Link to="/" className="btn btn-primary" style={{ marginTop: 24 }}>Về trang chủ</Link>
       </div>
     );
   }
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '30px 20px' }}>
-      <Link to="/" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 'bold' }}>← Quay lại danh sách</Link>
+    <div>
+      <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--primary)', fontWeight: 600 }}>
+        <ChevronLeft size={16} /> Quay lại danh sách
+      </Link>
 
-      <div style={{ marginTop: '30px', background: 'white', padding: '30px', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
-        <h1 style={{ fontSize: '2.5rem', marginBottom: '10px', color: '#000000ff' }}>{concert.title}</h1>
-        <p style={{ fontSize: '1.1rem', color: '#4b5563', marginBottom: '20px', paddingTop: '30px' }}>{concert.venue} &nbsp;|&nbsp; {new Date(concert.startsAt).toLocaleString('vi-VN')}</p>
+      <div className="card" style={{ marginTop: 20, padding: 30 }}>
+        <h1 style={{ fontSize: 30, marginBottom: 10 }}>{concert.title}</h1>
+        <p style={{ fontSize: 16, color: 'var(--text-2)', marginBottom: 20 }}>{concert.venue} &nbsp;|&nbsp; {new Date(concert.startsAt).toLocaleString('vi-VN')}</p>
 
         {Array.isArray(concert.artists) && concert.artists.length > 0 && (
-          <p style={{ fontSize: '1.05rem', color: '#111827', fontWeight: 600, marginBottom: '20px' }}>
+          <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 20 }}>
             {concert.artists.join(', ')}
           </p>
         )}
 
         {/* ===== AI Artist Bio ===== */}
         {concert.artistBio && (
-          <div style={{
-            background: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
-            border: '1px solid #c4b5fd',
-            borderLeft: '4px solid #7c3aed',
-            borderRadius: '12px',
-            padding: '20px 24px',
-            marginBottom: '28px',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-              <span style={{ fontSize: '1.2rem' }}>🤖</span>
-              <span style={{
-                fontWeight: 700, color: '#7c3aed', fontSize: '0.85rem',
-                textTransform: 'uppercase', letterSpacing: '0.5px'
-              }}>
+          <div className="card" style={{ background: 'var(--primary-soft)', borderLeft: '4px solid var(--accent)', padding: '20px 24px', marginBottom: 28 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <Sparkles size={16} color="var(--accent)" />
+              <span style={{ fontWeight: 700, color: 'var(--accent)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 AI Artist Bio
               </span>
             </div>
-            <p style={{
-              color: '#3730a3', lineHeight: 1.8, margin: 0,
-              fontSize: '0.97rem', whiteSpace: 'pre-wrap'
-            }}>
-              {concert.artistBio}
-            </p>
+            <p style={{ lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>{concert.artistBio}</p>
           </div>
         )}
 
         {checkoutError && (
-          <div style={{ background: '#fee2e2', borderLeft: '4px solid #ef4444', color: '#b91c1c', padding: '15px', marginBottom: '25px', borderRadius: '4px' }}>
+          <div className="alert alert-danger" style={{ marginBottom: 25 }}>
             <strong>Lỗi thanh toán:</strong> {checkoutError}
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: '40px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 40, flexWrap: 'wrap' }}>
 
-          {/* Cột trái: 2. BẢN ĐỒ SVG TƯƠNG TÁC */}
-          <div style={{ flex: '1 1 500px', background: '#f8fafc', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column' }}>
-            <h3 style={{ fontSize: '1.3rem', marginBottom: '20px', color: '#334155', textAlign: 'center' }}>Sơ đồ & Tình trạng ghế</h3>
+          {/* Cột trái: Bản đồ SVG tương tác */}
+          <div className="seat-map" style={{ flex: '1 1 500px', background: 'var(--surface-2)', padding: 20, borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
+            <h3 style={{ fontSize: 18, marginBottom: 20, textAlign: 'center' }}>Sơ đồ & Tình trạng ghế</h3>
 
             {sanitizedSeatMapSvg ? (
               <div
                 ref={seatMapRef}
-                style={{ width: '100%', minHeight: '400px' }}
+                style={{ width: '100%', minHeight: 400 }}
                 dangerouslySetInnerHTML={{ __html: sanitizedSeatMapSvg }}
               />
             ) : (
-              <svg viewBox="0 0 800 600" style={{ width: '100%', height: '100%', minHeight: '400px', userSelect: 'none' }}>
+              <svg viewBox="0 0 800 600" style={{ width: '100%', height: '100%', minHeight: 400, userSelect: 'none' }}>
                 {/* Vẽ Sân Khấu (Stage) */}
                 <rect x="250" y="20" width="300" height="80" rx="15" fill="#1e293b" />
                 <text x="400" y="65" fill="white" fontSize="26" fontWeight="bold" textAnchor="middle" letterSpacing="2">SÂN KHẤU</text>
@@ -389,16 +377,16 @@ export default function ConcertDetail() {
                 })}
               </svg>
             )}
-            <p style={{ textAlign: 'center', fontSize: '0.9rem', color: '#64748b', marginTop: '15px' }}>
+            <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-3)', marginTop: 15 }}>
               * Bấm trực tiếp vào khu vực trên bản đồ để chọn vé nhanh
             </p>
           </div>
 
           {/* Cột phải: Danh sách vé & Mua hàng */}
           <div style={{ flex: '1 1 350px', display: 'flex', flexDirection: 'column' }}>
-            <h3 style={{ fontSize: '1.5rem', marginBottom: '20px' }}>Giỏ hàng của bạn</h3>
+            <h3 style={{ fontSize: 20, marginBottom: 20 }}>Giỏ hàng của bạn</h3>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', flexGrow: 1 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 15, flexGrow: 1 }}>
               {concert.ticketTypes?.map((ticket: any) => {
                 const isSaleStarted = new Date() >= new Date(ticket.saleStartsAt);
                 const qty = quantities[ticket.id] || 0;
@@ -406,67 +394,68 @@ export default function ConcertDetail() {
                 const isLocked = (activeTicketTypeId && ticket.id !== activeTicketTypeId) || !isSaleStarted;
 
                 return (
-                  <div key={ticket.id} style={{
-                    padding: '15px',
-                    border: qty > 0 ? '2px solid #3b82f6' : '1px solid #e5e7eb',
-                    borderRadius: '10px',
-                    background: (isSoldOut || isLocked) ? '#f9fafb' : 'white',
+                  <div key={ticket.id} className="card" style={{
+                    padding: 15,
+                    borderWidth: qty > 0 ? 2 : 1,
+                    borderColor: qty > 0 ? 'var(--primary)' : 'var(--border)',
+                    background: (isSoldOut || isLocked) ? 'var(--surface-2)' : 'var(--surface)',
                     opacity: isLocked ? 0.5 : 1,
-                    transition: 'all 0.2s'
                   }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                       <div>
-                        <div style={{ fontWeight: 'bold', fontSize: '1.2rem', color: (isSoldOut || isLocked) ? '#9ca3af' : '#111827' }}>{ticket.name}</div>
-                        <div style={{ color: (isSoldOut || isLocked) ? '#9ca3af' : '#ef4444', fontWeight: 'bold', marginTop: '5px' }}>
+                        <div style={{ fontWeight: 700, fontSize: 19, color: (isSoldOut || isLocked) ? 'var(--text-3)' : 'var(--text)' }}>{ticket.name}</div>
+                        <div style={{ color: (isSoldOut || isLocked) ? 'var(--text-3)' : 'var(--danger)', fontWeight: 700, marginTop: 5 }}>
                           {ticket.price.toLocaleString('vi-VN')} VNĐ
                         </div>
                       </div>
-                      <div style={{ textAlign: 'right', fontSize: '0.85rem', color: '#6b7280' }}>
-                        <div>Còn lại: <strong style={{ color: isSoldOut ? '#ef4444' : (isLocked ? '#9ca3af' : '#059669') }}>{ticket.remainingQty}</strong></div>
+                      <div style={{ textAlign: 'right', fontSize: 13, color: 'var(--text-2)' }}>
+                        <div>Còn lại: <strong style={{ color: isSoldOut ? 'var(--danger)' : (isLocked ? 'var(--text-3)' : 'var(--success)') }}>{ticket.remainingQty}</strong></div>
                         <div>Giới hạn: <strong>{ticket.maxPerUser}/người</strong></div>
                       </div>
                     </div>
 
                     {!isSoldOut && isSaleStarted && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginTop: '15px', borderTop: '1px dashed #e5e7eb', paddingTop: '15px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 15, marginTop: 15, borderTop: '1px dashed var(--border)', paddingTop: 15 }}>
                         <button
+                          className="btn btn-secondary btn-sm"
                           onClick={() => handleQuantityChange(ticket.id, -1, ticket.maxPerUser, ticket.remainingQty)}
                           disabled={qty === 0 || isLocked}
-                          style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1px solid #d1d5db', background: (qty === 0 || isLocked) ? '#f3f4f6' : 'white', cursor: (qty === 0 || isLocked) ? 'not-allowed' : 'pointer', fontWeight: 'bold', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>-</button>
-                        <span style={{ fontWeight: 'bold', fontSize: '1.2rem', width: '30px', textAlign: 'center', color: isLocked ? '#9ca3af' : '#111827' }}>{qty}</span>
+                          style={{ width: 36, height: 36, borderRadius: '50%', padding: 0 }}>-</button>
+                        <span style={{ fontWeight: 700, fontSize: 19, width: 30, textAlign: 'center', color: isLocked ? 'var(--text-3)' : 'var(--text)' }}>{qty}</span>
                         <button
+                          className="btn btn-secondary btn-sm"
                           onClick={() => handleQuantityChange(ticket.id, 1, ticket.maxPerUser, ticket.remainingQty)}
                           disabled={qty >= ticket.maxPerUser || qty >= ticket.remainingQty || isLocked}
-                          style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1px solid #d1d5db', background: (qty >= ticket.maxPerUser || qty >= ticket.remainingQty || isLocked) ? '#f3f4f6' : 'white', cursor: (qty >= ticket.maxPerUser || qty >= ticket.remainingQty || isLocked) ? 'not-allowed' : 'pointer', fontWeight: 'bold', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                          style={{ width: 36, height: 36, borderRadius: '50%', padding: 0 }}>+</button>
                       </div>
                     )}
                     {!isSoldOut && !isSaleStarted && (
-                      <div style={{ marginTop: '10px', color: '#d97706', fontWeight: 'bold', textAlign: 'center', padding: '10px 0', background: '#fef3c7', borderRadius: '6px', fontSize: '0.9rem' }}>
+                      <div className="alert alert-warning" style={{ marginTop: 10, textAlign: 'center' }}>
                         CHƯA MỞ BÁN (Mở lúc: {new Date(ticket.saleStartsAt).toLocaleString('vi-VN')})
                       </div>
                     )}
-                    {isSoldOut && <div style={{ marginTop: '10px', color: '#ef4444', fontWeight: 'bold', textAlign: 'center', padding: '10px 0', background: '#fee2e2', borderRadius: '6px' }}>ĐÃ BÁN HẾT</div>}
+                    {isSoldOut && <div className="alert alert-danger" style={{ marginTop: 10, textAlign: 'center' }}>ĐÃ BÁN HẾT</div>}
                   </div>
                 );
               })}
             </div>
 
             {/* Thanh toán Box */}
-            <div style={{ marginTop: '25px', padding: '25px', background: '#0f172a', borderRadius: '12px', color: 'white', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px', fontSize: '1.1rem', color: '#94a3b8' }}>
+            <div style={{ marginTop: 25, padding: 25, background: '#0f172a', borderRadius: 'var(--radius-lg)', color: 'white', boxShadow: 'var(--shadow-md)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 15, fontSize: 17, color: '#94a3b8' }}>
                 <span>Tổng số lượng vé:</span>
-                <span style={{ fontWeight: 'bold', color: 'white' }}>{totalTickets} vé</span>
+                <span style={{ fontWeight: 700, color: 'white' }}>{totalTickets} vé</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '25px', fontSize: '1.4rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 25, fontSize: 22 }}>
                 <span>Tổng tiền:</span>
-                <span style={{ fontWeight: 'bold', color: '#38bdf8' }}>{totalAmount.toLocaleString('vi-VN')} VNĐ</span>
+                <span style={{ fontWeight: 700, color: '#38bdf8' }}>{totalAmount.toLocaleString('vi-VN')} VNĐ</span>
               </div>
 
-              <div style={{ marginBottom: '20px' }}>
-                <p style={{ marginBottom: '10px', fontSize: '0.9rem', color: '#94a3b8' }}>Phương thức thanh toán:</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ marginBottom: 20 }}>
+                <p style={{ marginBottom: 10, fontSize: 14, color: '#94a3b8' }}>Phương thức thanh toán:</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {vnpayEnabled && (
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
                       <input
                         type="radio"
                         name="paymentMethod"
@@ -477,7 +466,7 @@ export default function ConcertDetail() {
                       <span style={{ color: paymentMethod === 'VNPAY' ? 'white' : '#94a3b8' }}>Thẻ nội địa - VNPay Sandbox</span>
                     </label>
                   )}
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
                     <input
                       type="radio"
                       name="paymentMethod"
@@ -491,9 +480,10 @@ export default function ConcertDetail() {
               </div>
 
               <button
+                className="btn btn-primary"
                 onClick={handleCheckout}
                 disabled={totalTickets === 0 || isCheckingOut}
-                style={{ width: '100%', padding: '16px', background: (totalTickets === 0 || isCheckingOut) ? '#334155' : '#2563eb', color: (totalTickets === 0 || isCheckingOut) ? '#94a3b8' : 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '1.2rem', cursor: (totalTickets === 0 || isCheckingOut) ? 'not-allowed' : 'pointer', transition: 'background 0.2s' }}>
+                style={{ width: '100%', padding: 16, fontSize: 17 }}>
                 {isCheckingOut ? 'Đang kết nối cổng thanh toán...' : 'THANH TOÁN NGAY'}
               </button>
             </div>

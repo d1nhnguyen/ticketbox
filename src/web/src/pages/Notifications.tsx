@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import apiClient from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 import { Navigate } from 'react-router-dom';
+import { Bell } from 'lucide-react';
 
 export default function Notifications() {
   const { token, role } = useAuth();
@@ -55,56 +56,57 @@ export default function Notifications() {
   const getNotificationDetails = (noti: any) => {
     let title = noti.payload?.title;
     let message = noti.payload?.message;
-    let emoji = '';
 
     if (noti.type === 'ORDER_PAID') {
       title = 'Thanh toán vé thành công!';
       message = `Đơn hàng ${noti.payload?.orderId?.substring(0, 8)}... đã được thanh toán thành công với số tiền ${Number(noti.payload?.totalAmount || 0).toLocaleString('vi-VN')} VNĐ. Vé điện tử QR đã được phát hành!`;
-      emoji = '';
     } else if (noti.type === 'REMINDER_24H') {
       title = noti.payload?.title || 'Nhắc nhở sự kiện sắp diễn ra';
       message = noti.payload?.message || 'Concert của bạn sẽ bắt đầu trong vòng 24 giờ tới. Hãy chuẩn bị sẵn vé QR!';
-      emoji = '';
     } else if (noti.type === 'CONCERT_CANCELLED') {
       const concertTitle = noti.payload?.concertTitle || 'concert';
       title = `Sự kiện "${concertTitle}" đã bị hủy`;
       message = noti.payload?.message || `Rất tiếc, sự kiện "${concertTitle}" đã bị hủy. Vé của bạn sẽ được hoàn tiền trong thời gian sớm nhất.`;
-      emoji = '';
     } else if (noti.type === 'WARNING') {
       title = title || 'Cảnh báo hệ thống';
-      emoji = '';
     }
 
-    return { title: title || 'Thông báo mới', message: message || '', emoji };
+    return { title: title || 'Thông báo mới', message: message || '' };
   };
 
   return (
-    <div style={{ maxWidth: '800px', margin: '40px auto', padding: '0 20px' }}>
-      <h1 style={{ fontSize: '2rem', marginBottom: '20px', color: '#1f2937' }}>Hộp thư của bạn</h1>
-      
+    <div style={{ maxWidth: 800 }}>
+      <div className="page-header">
+        <div className="page-title">Hộp thư của bạn</div>
+      </div>
+
       {loading ? (
-        <p style={{ textAlign: 'center', color: '#6b7280' }}>Đang tải thông báo...</p>
+        <div className="empty-state">
+          <div className="spinner" style={{ margin: '0 auto 12px' }} />
+          Đang tải thông báo...
+        </div>
       ) : (
-        <div style={{ background: 'white', borderRadius: '12px', border: '1px solid #e5e7eb', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
+        <div className="card" style={{ overflow: 'hidden' }}>
           {notifications.length > 0 ? (
             notifications.map((noti: any) => {
-              const { title, message, emoji } = getNotificationDetails(noti);
+              const { title, message } = getNotificationDetails(noti);
               const dateStr = noti.sentAt ? new Date(noti.sentAt).toLocaleString('vi-VN') : 'Vừa xong';
               return (
-                <div key={noti.id} style={{ padding: '20px', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: '15px', alignItems: 'flex-start', background: noti.status === 'SENT' ? 'white' : '#f9fafb' }}>
-                  {emoji && <div style={{ fontSize: '1.8rem' }}>{emoji}</div>}
+                <div key={noti.id} style={{
+                  padding: 20, borderBottom: '1px solid var(--border)', display: 'flex', gap: 15, alignItems: 'flex-start',
+                  background: noti.status === 'SENT' ? 'var(--surface)' : 'var(--surface-2)',
+                }}>
+                  <div className="stat-icon" style={{ marginTop: 2 }}><Bell size={16} /></div>
                   <div>
-                    <h3 style={{ fontSize: '1.1rem', marginBottom: '5px', color: '#111827', fontWeight: 600 }}>{title}</h3>
-                    <p style={{ color: '#4b5563', marginBottom: '10px', lineHeight: '1.5' }}>{message}</p>
-                    <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>{dateStr}</span>
+                    <h3 style={{ fontSize: 16, marginBottom: 5 }}>{title}</h3>
+                    <p style={{ color: 'var(--text-2)', marginBottom: 10, lineHeight: 1.5 }}>{message}</p>
+                    <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{dateStr}</span>
                   </div>
                 </div>
               );
             })
           ) : (
-            <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
-              <p>Bạn chưa có thông báo nào.</p>
-            </div>
+            <div className="empty-state">Bạn chưa có thông báo nào.</div>
           )}
         </div>
       )}

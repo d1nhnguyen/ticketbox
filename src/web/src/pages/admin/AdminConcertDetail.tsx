@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { ChevronLeft } from 'lucide-react';
 import apiClient from '../../api/client';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -57,18 +58,11 @@ interface ConcertStats {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-
-
-const inputStyle: React.CSSProperties = {
-  width: '100%', padding: '9px 12px', borderRadius: '8px',
-  border: '1.5px solid #d1d5db', fontSize: '0.9rem', outline: 'none',
-  boxSizing: 'border-box', background: '#fafafa', color: '#111827',
+const statusBadgeClass = (status: string) => {
+  if (status === 'ON_SALE') return 'badge badge-success';
+  if (status === 'DRAFT') return 'badge badge-muted';
+  return 'badge badge-danger'; // SOLD_OUT / CANCELLED
 };
-
-const badgeStyle = (color: string, bg: string, border: string): React.CSSProperties => ({
-  display: 'inline-block', padding: '3px 10px', borderRadius: '20px',
-  fontSize: '0.78rem', fontWeight: 600, color, background: bg, border: `1px solid ${border}`,
-});
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -131,7 +125,7 @@ export default function AdminConcertDetail() {
         imageUrl: res.data.imageUrl || '',
       });
     } catch {
-      navigate('/admin');
+      navigate('/admin/concerts');
     } finally {
       setLoading(false);
     }
@@ -203,12 +197,12 @@ export default function AdminConcertDetail() {
         await apiClient.patch(`/admin/ticket-types/${editTt.id}`,
           { name, price: Number(price), totalQty: Number(totalQty), maxPerUser: Number(maxPerUser), saleStartsAt: new Date(saleStartsAt).toISOString() },
           { headers: authHeader });
-        setTtSuccess(`✅ Đã cập nhật hạng vé "${name}"`);
+        setTtSuccess(`Đã cập nhật hạng vé "${name}"`);
       } else {
         await apiClient.post(`/admin/ticket-types`,
           { concertId: id, name, price: Number(price), totalQty: Number(totalQty), maxPerUser: Number(maxPerUser), saleStartsAt: new Date(saleStartsAt).toISOString() },
           { headers: authHeader });
-        setTtSuccess(`✅ Đã tạo hạng vé "${name}"`);
+        setTtSuccess(`Đã tạo hạng vé "${name}"`);
       }
       resetTtForm();
       await Promise.all([fetchConcert(), fetchStats()]);
@@ -275,7 +269,7 @@ export default function AdminConcertDetail() {
         },
         { headers: authHeader }
       );
-      setInfoSuccess('✅ Đã cập nhật thông tin concert thành công!');
+      setInfoSuccess('Đã cập nhật thông tin concert thành công!');
       await fetchConcert();
     } catch (err: any) {
       const msg = err.response?.data?.message;
@@ -346,8 +340,9 @@ export default function AdminConcertDetail() {
   // ── Render helpers ────────────────────────────────────────────────────────
 
   if (loading) return (
-    <div style={{ padding: '80px', textAlign: 'center', color: '#6b7280', fontSize: '1.1rem' }}>
-      ⏳ Đang tải...
+    <div className="empty-state">
+      <div className="spinner" style={{ margin: '0 auto 12px' }} />
+      Đang tải...
     </div>
   );
   if (!concert) return null;
@@ -356,166 +351,99 @@ export default function AdminConcertDetail() {
   const revenueTotal = stats?.totalRevenue ?? 0;
   const statsByTicketType = new Map(stats?.ticketTypes.map(ticketType => [ticketType.id, ticketType]) ?? []);
 
-  const statusColors: Record<string, [string, string, string]> = {
-    ON_SALE: ['#059669', '#f0fdf4', '#bbf7d0'],
-    DRAFT: ['#9ca3af', '#f9fafb', '#e5e7eb'],
-    SOLD_OUT: ['#dc2626', '#fef2f2', '#fecaca'],
-    CANCELLED: ['#dc2626', '#fef2f2', '#fecaca'],
-  };
-  const [sc, sbg, sbd] = statusColors[concert.status] ?? ['#9ca3af', '#f9fafb', '#e5e7eb'];
-
   const TabBtn = ({ tab, label }: { tab: typeof activeTab; label: string }) => (
     <button
+      className={`tab${activeTab === tab ? ' active' : ''}`}
       onClick={() => { setActiveTab(tab); resetTtForm(); }}
-      style={{
-        padding: '10px 22px', border: 'none', cursor: 'pointer', fontWeight: 600,
-        fontSize: '0.9rem', borderRadius: '8px 8px 0 0', transition: 'all 0.15s',
-        background: activeTab === tab ? 'white' : 'transparent',
-        color: activeTab === tab ? '#111827' : '#6b7280',
-        borderBottom: activeTab === tab ? '2px solid #3b82f6' : '2px solid transparent',
-      }}
     >{label}</button>
   );
 
   return (
-    <div style={{ maxWidth: '1100px', margin: '36px auto', padding: '0 20px' }}>
-
-      {/* ── Breadcrumb ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px', fontSize: '0.9rem', color: '#6b7280' }}>
-        <button onClick={() => navigate('/admin')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#3b82f6', fontWeight: 600, padding: 0 }}>
-          ← Dashboard
-        </button>
-        <span>/</span>
-        <span style={{ color: '#111827', fontWeight: 600 }}>{concert.title}</span>
-      </div>
+    <div>
+      <Link to="/admin/concerts" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--primary)', fontWeight: 600, fontSize: 14, marginBottom: 20 }}>
+        <ChevronLeft size={16} /> Sự kiện
+      </Link>
 
       {/* ── Concert Header Card ── */}
-      <div style={{
-        background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-        borderRadius: '16px', padding: '28px 32px', color: 'white', marginBottom: '28px',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+      <div className="card" style={{ padding: '24px 28px', marginBottom: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-              <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 800 }}>{concert.title}</h1>
-              <span style={badgeStyle(sc, sbg, sbd)}>{concert.status}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+              <h1 style={{ fontSize: 24 }}>{concert.title}</h1>
+              <span className={statusBadgeClass(concert.status)}>{concert.status}</span>
             </div>
-            <p style={{ margin: 0, color: '#94a3b8', fontSize: '1rem' }}>
+            <p style={{ color: 'var(--text-2)' }}>
               {concert.venue} &nbsp;·&nbsp; {new Date(concert.startsAt).toLocaleString('vi-VN')}
             </p>
-            <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '0.82rem' }}>ID: {concert.id}</p>
+            <p style={{ color: 'var(--text-3)', fontSize: 13, marginTop: 4 }}>ID: {concert.id}</p>
           </div>
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: '12px', padding: '14px 20px', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#38bdf8' }}>{soldTotal}</div>
-              <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '2px' }}>Vé đã bán</div>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <div className="stat-card" style={{ minWidth: 120, alignItems: 'center', textAlign: 'center' }}>
+              <span className="stat-value">{soldTotal}</span>
+              <span className="stat-label">Vé đã bán</span>
             </div>
-            <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: '12px', padding: '14px 20px', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#34d399' }}>{revenueTotal.toLocaleString('vi-VN')}</div>
-              <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '2px' }}>Doanh thu (VNĐ)</div>
+            <div className="stat-card" style={{ minWidth: 140, alignItems: 'center', textAlign: 'center' }}>
+              <span className="stat-value">{revenueTotal.toLocaleString('vi-VN')}</span>
+              <span className="stat-label">Doanh thu (VNĐ)</span>
             </div>
-            <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: '12px', padding: '14px 20px', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#a78bfa' }}>{batches.length}</div>
-              <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '2px' }}>CSV Imports</div>
+            <div className="stat-card" style={{ minWidth: 120, alignItems: 'center', textAlign: 'center' }}>
+              <span className="stat-value">{batches.length}</span>
+              <span className="stat-label">CSV Imports</span>
             </div>
           </div>
         </div>
       </div>
 
-      <div style={{ borderBottom: '1px solid #e5e7eb', marginBottom: '0', display: 'flex', gap: '4px' }}>
+      <div className="tabs">
         <TabBtn tab="info" label="Thông tin" />
         <TabBtn tab="tickets" label="Hạng vé" />
         <TabBtn tab="bio" label="AI Artist Bio" />
         <TabBtn tab="guests" label="Guest List (CSV)" />
       </div>
 
-      <div style={{ background: 'white', borderRadius: '0 0 16px 16px', border: '1px solid #e5e7eb', borderTop: 'none', padding: '28px', boxShadow: '0 4px 16px rgba(0,0,0,0.05)' }}>
+      <div className="card card-body">
 
         {/* ══════════════ TAB: EDIT INFO ══════════════ */}
         {activeTab === 'info' && (
           <div>
-            <h2 style={{ margin: '0 0 24px', fontSize: '1.2rem', fontWeight: 700, color: '#111827' }}>Chỉnh sửa thông tin Concert</h2>
+            <h2 style={{ fontSize: 18, marginBottom: 20 }}>Chỉnh sửa thông tin Concert</h2>
 
-            {infoError && (
-              <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '12px 16px', color: '#dc2626', marginBottom: '20px', fontSize: '0.9rem' }}>
-                {infoError}
-              </div>
-            )}
-            {infoSuccess && (
-              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '12px 16px', color: '#059669', marginBottom: '20px', fontSize: '0.9rem' }}>
-                {infoSuccess}
-              </div>
-            )}
+            {infoError && <div className="alert alert-danger" style={{ marginBottom: 20 }}>{infoError}</div>}
+            {infoSuccess && <div className="alert alert-success" style={{ marginBottom: 20 }}>{infoSuccess}</div>}
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '20px' }}>
-              <div>
-                <label style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', color: '#374151', marginBottom: '6px' }}>Tên concert *</label>
-                <input
-                  style={inputStyle}
-                  placeholder="Tên concert"
-                  value={editForm.title}
-                  onChange={e => setEditForm(p => ({ ...p, title: e.target.value }))}
-                />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+              <div className="field">
+                <label className="label">Tên concert *</label>
+                <input className="input" placeholder="Tên concert" value={editForm.title} onChange={e => setEditForm(p => ({ ...p, title: e.target.value }))} />
               </div>
-              <div>
-                <label style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', color: '#374151', marginBottom: '6px' }}>Địa điểm *</label>
-                <input
-                  style={inputStyle}
-                  placeholder="Địa điểm tổ chức"
-                  value={editForm.venue}
-                  onChange={e => setEditForm(p => ({ ...p, venue: e.target.value }))}
-                />
+              <div className="field">
+                <label className="label">Địa điểm *</label>
+                <input className="input" placeholder="Địa điểm tổ chức" value={editForm.venue} onChange={e => setEditForm(p => ({ ...p, venue: e.target.value }))} />
               </div>
-              <div>
-                <label style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', color: '#374151', marginBottom: '6px' }}>Ngày & Giờ *</label>
-                <input
-                  style={inputStyle}
-                  type="datetime-local"
-                  value={editForm.startsAt}
-                  onChange={e => setEditForm(p => ({ ...p, startsAt: e.target.value }))}
-                />
+              <div className="field">
+                <label className="label">Ngày & Giờ *</label>
+                <input className="input" type="datetime-local" value={editForm.startsAt} onChange={e => setEditForm(p => ({ ...p, startsAt: e.target.value }))} />
               </div>
-              <div>
-                <label style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', color: '#374151', marginBottom: '6px' }}>Slug *</label>
-                <input
-                  style={{ ...inputStyle, color: '#6b7280' }}
-                  placeholder="vd: blackpink-tour-2026"
-                  value={editForm.slug}
-                  onChange={e => setEditForm(p => ({ ...p, slug: e.target.value }))}
-                />
+              <div className="field">
+                <label className="label">Slug *</label>
+                <input className="input" placeholder="vd: blackpink-tour-2026" value={editForm.slug} onChange={e => setEditForm(p => ({ ...p, slug: e.target.value }))} />
               </div>
-              <div style={{ gridColumn: '1 / -1' }}>
-                <label style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', color: '#374151', marginBottom: '6px' }}>Ảnh bìa (Tải lên hoặc dán Link)</label>
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                  <input
-                    style={{ ...inputStyle, flex: 1 }}
-                    placeholder="VD: https://images.unsplash.com/photo-xxx"
-                    value={editForm.imageUrl}
-                    onChange={e => setEditForm(p => ({ ...p, imageUrl: e.target.value }))}
-                  />
-                  <label style={{
-                    padding: '9px 16px', background: '#3b82f6', color: 'white', borderRadius: '8px',
-                    cursor: isUploadingImage ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '0.9rem',
-                    opacity: isUploadingImage ? 0.7 : 1, whiteSpace: 'nowrap'
-                  }}>
+              <div className="field" style={{ gridColumn: '1 / -1' }}>
+                <label className="label">Ảnh bìa (Tải lên hoặc dán Link)</label>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                  <input className="input" placeholder="VD: https://images.unsplash.com/photo-xxx" value={editForm.imageUrl} onChange={e => setEditForm(p => ({ ...p, imageUrl: e.target.value }))} />
+                  <label className="btn btn-secondary btn-sm" style={{ cursor: isUploadingImage ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>
                     {isUploadingImage ? 'Đang tải...' : 'Browse...'}
                     <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} disabled={isUploadingImage} />
                   </label>
                 </div>
                 {editForm.imageUrl && (
-                  <div style={{ marginTop: '10px' }}>
-                    <img src={editForm.imageUrl} alt="Preview" style={{ height: '100px', borderRadius: '8px', objectFit: 'cover' }} />
-                  </div>
+                  <img src={editForm.imageUrl} alt="Preview" style={{ height: 100, borderRadius: 8, objectFit: 'cover', marginTop: 10 }} />
                 )}
               </div>
-              <div>
-                <label style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', color: '#374151', marginBottom: '6px' }}>Trạng thái *</label>
-                <select
-                  style={{ ...inputStyle, cursor: 'pointer', appearance: 'none' }}
-                  value={editForm.status}
-                  onChange={e => setEditForm(p => ({ ...p, status: e.target.value }))}
-                >
+              <div className="field">
+                <label className="label">Trạng thái *</label>
+                <select className="select" value={editForm.status} onChange={e => setEditForm(p => ({ ...p, status: e.target.value }))}>
                   <option value="ON_SALE">ON_SALE — Công khai với khán giả</option>
                   <option value="DRAFT">DRAFT — Ẩn (chưa công bố)</option>
                   <option value="SOLD_OUT">SOLD_OUT — Hết vé</option>
@@ -524,48 +452,39 @@ export default function AdminConcertDetail() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-              <button
-                onClick={handleUpdateConcert}
-                disabled={isSavingInfo}
-                style={{
-                  padding: '11px 28px', border: 'none', borderRadius: '9px', fontWeight: 700, fontSize: '0.95rem',
-                  cursor: isSavingInfo ? 'not-allowed' : 'pointer',
-                  background: isSavingInfo ? '#e5e7eb' : '#3b82f6',
-                  color: isSavingInfo ? '#9ca3af' : 'white',
-                }}
-              >
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              <button className="btn btn-primary" onClick={handleUpdateConcert} disabled={isSavingInfo}>
                 {isSavingInfo ? 'Đang lưu...' : 'Lưu thay đổi'}
               </button>
               <button
+                className="btn btn-secondary"
                 onClick={() => {
                   if (!concert) return;
                   setEditForm({ title: concert.title, venue: concert.venue, startsAt: concert.startsAt.slice(0, 16), slug: concert.slug, status: concert.status, imageUrl: concert.imageUrl || '' });
                   setInfoError(''); setInfoSuccess('');
                 }}
-                style={{ padding: '11px 20px', border: '1.5px solid #d1d5db', borderRadius: '9px', background: 'white', color: '#6b7280', fontWeight: 600, cursor: 'pointer', fontSize: '0.9rem' }}
               >
                 Khôi phục
               </button>
             </div>
 
             {/* Danger zone */}
-            <div style={{ marginTop: '40px', padding: '20px', border: '1.5px solid #fecaca', borderRadius: '12px', background: '#fff5f5' }}>
-              <h3 style={{ margin: '0 0 8px', color: '#dc2626', fontSize: '1rem', fontWeight: 700 }}>Vùng nguy hiểm</h3>
-              <p style={{ margin: '0 0 14px', color: '#9b1c1c', fontSize: '0.88rem' }}>
+            <div style={{ marginTop: 40, padding: 20, border: '1.5px solid var(--danger-border)', borderRadius: 'var(--radius-lg)', background: 'var(--danger-bg)' }}>
+              <h3 style={{ color: 'var(--danger)', fontSize: 16, marginBottom: 8 }}>Vùng nguy hiểm</h3>
+              <p style={{ color: 'var(--danger)', fontSize: 14, marginBottom: 14 }}>
                 Hủy concert sẽ void toàn bộ vé VALID và gửi thông báo đến người mua. Không thể hoàn tác.
               </p>
               <button
+                className="btn btn-danger"
                 onClick={async () => {
                   if (!confirm(`Hủy concert "${concert?.title}"? Hành động này KHÔNG THỂ hoàn tác.`)) return;
                   try {
                     await apiClient.post(`/admin/concerts/${id}/cancel`, {}, { headers: authHeader });
-                    navigate('/admin');
+                    navigate('/admin/concerts');
                   } catch (err: any) {
                     alert(err.response?.data?.message || 'Không thể hủy concert.');
                   }
                 }}
-                style={{ padding: '10px 22px', background: '#dc2626', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem' }}
               >
                 Hủy Concert
               </button>
@@ -576,74 +495,60 @@ export default function AdminConcertDetail() {
         {/* ══════════════ TAB: TICKET TYPES ══════════════ */}
         {activeTab === 'tickets' && (
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#111827' }}>
-                Quản lý Hạng vé
-              </h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h2 style={{ fontSize: 18 }}>Quản lý Hạng vé</h2>
               {editTt && (
-                <button onClick={resetTtForm} style={{ background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', borderRadius: '8px', padding: '6px 14px', cursor: 'pointer', fontSize: '0.85rem' }}>
-                  ✕ Hủy chỉnh sửa
-                </button>
+                <button className="btn btn-ghost btn-sm" onClick={resetTtForm}>✕ Hủy chỉnh sửa</button>
               )}
             </div>
 
             {/* Form */}
-            <div style={{ background: editTt ? '#fffbeb' : '#f8fafc', border: `1.5px solid ${editTt ? '#fde68a' : '#e2e8f0'}`, borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
-              <h3 style={{ margin: '0 0 16px', fontSize: '1rem', fontWeight: 700, color: '#374151' }}>
+            <div className="card" style={{ padding: 20, marginBottom: 24, background: editTt ? 'var(--warning-bg)' : 'var(--surface-2)', borderColor: editTt ? 'var(--warning-border)' : 'var(--border)' }}>
+              <h3 style={{ fontSize: 15, marginBottom: 16 }}>
                 {editTt ? `Chỉnh sửa: ${editTt.name}` : 'Thêm hạng vé mới'}
               </h3>
 
-              {ttError && <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '10px 14px', color: '#dc2626', marginBottom: '14px', fontSize: '0.9rem' }}>{ttError}</div>}
-              {ttSuccess && <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '10px 14px', color: '#059669', marginBottom: '14px', fontSize: '0.9rem' }}>{ttSuccess}</div>}
+              {ttError && <div className="alert alert-danger" style={{ marginBottom: 14 }}>{ttError}</div>}
+              {ttSuccess && <div className="alert alert-success" style={{ marginBottom: 14 }}>{ttSuccess}</div>}
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginBottom: '14px' }}>
-                <div>
-                  <label style={{ display: 'block', fontWeight: 600, fontSize: '0.82rem', color: '#374151', marginBottom: '5px' }}>Tên hạng vé *</label>
-                  <input style={inputStyle} placeholder="VD: VIP, GA, CAT1..." value={ttForm.name} onChange={e => setTtForm(p => ({ ...p, name: e.target.value }))} />
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label className="label">Tên hạng vé *</label>
+                  <input className="input" placeholder="VD: VIP, GA, CAT1..." value={ttForm.name} onChange={e => setTtForm(p => ({ ...p, name: e.target.value }))} />
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontWeight: 600, fontSize: '0.82rem', color: '#374151', marginBottom: '5px' }}>Giá (VNĐ) *</label>
-                  <input style={inputStyle} type="number" min="0" placeholder="VD: 500000" value={ttForm.price} onChange={e => setTtForm(p => ({ ...p, price: e.target.value }))} />
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label className="label">Giá (VNĐ) *</label>
+                  <input className="input" type="number" min="0" placeholder="VD: 500000" value={ttForm.price} onChange={e => setTtForm(p => ({ ...p, price: e.target.value }))} />
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontWeight: 600, fontSize: '0.82rem', color: '#374151', marginBottom: '5px' }}>Tổng số lượng *</label>
-                  <input style={inputStyle} type="number" min="1" placeholder="VD: 500" value={ttForm.totalQty} onChange={e => setTtForm(p => ({ ...p, totalQty: e.target.value }))} />
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label className="label">Tổng số lượng *</label>
+                  <input className="input" type="number" min="1" placeholder="VD: 500" value={ttForm.totalQty} onChange={e => setTtForm(p => ({ ...p, totalQty: e.target.value }))} />
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontWeight: 600, fontSize: '0.82rem', color: '#374151', marginBottom: '5px' }}>Giới hạn/người *</label>
-                  <input style={inputStyle} type="number" min="1" placeholder="VD: 4" value={ttForm.maxPerUser} onChange={e => setTtForm(p => ({ ...p, maxPerUser: e.target.value }))} />
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label className="label">Giới hạn/người *</label>
+                  <input className="input" type="number" min="1" placeholder="VD: 4" value={ttForm.maxPerUser} onChange={e => setTtForm(p => ({ ...p, maxPerUser: e.target.value }))} />
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontWeight: 600, fontSize: '0.82rem', color: '#374151', marginBottom: '5px' }}>Bắt đầu bán *</label>
-                  <input style={inputStyle} type="datetime-local" value={ttForm.saleStartsAt} onChange={e => setTtForm(p => ({ ...p, saleStartsAt: e.target.value }))} />
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label className="label">Bắt đầu bán *</label>
+                  <input className="input" type="datetime-local" value={ttForm.saleStartsAt} onChange={e => setTtForm(p => ({ ...p, saleStartsAt: e.target.value }))} />
                 </div>
               </div>
 
-              <button
-                onClick={handleSaveTt}
-                disabled={isSavingTt}
-                style={{
-                  padding: '10px 24px', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: isSavingTt ? 'not-allowed' : 'pointer', fontSize: '0.9rem',
-                  background: isSavingTt ? '#e5e7eb' : (editTt ? '#f59e0b' : '#10b981'),
-                  color: isSavingTt ? '#9ca3af' : 'white',
-                }}
-              >
+              <button className="btn btn-primary" onClick={handleSaveTt} disabled={isSavingTt} style={{ marginTop: 14 }}>
                 {isSavingTt ? 'Đang lưu...' : (editTt ? 'Cập nhật hạng vé' : 'Thêm hạng vé')}
               </button>
             </div>
 
             {/* Table */}
             {concert.ticketTypes.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>
-                Chưa có hạng vé nào. Thêm hạng vé bên trên.
-              </div>
+              <div className="empty-state">Chưa có hạng vé nào. Thêm hạng vé bên trên.</div>
             ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+              <div className="table-wrap">
+                <table className="table">
                   <thead>
-                    <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                    <tr>
                       {['Hạng vé', 'Giá', 'Tổng', 'Còn lại', 'Đã bán', 'Giới hạn', 'Bán từ', ''].map(h => (
-                        <th key={h} style={{ padding: '12px 14px', textAlign: 'left', color: '#374151', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
+                        <th key={h}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -652,27 +557,27 @@ export default function AdminConcertDetail() {
                       const sold = statsByTicketType.get(tt.id)?.soldQty ?? 0;
                       const pct = tt.totalQty > 0 ? Math.round(sold / tt.totalQty * 100) : 0;
                       return (
-                        <tr key={tt.id} style={{ borderBottom: '1px solid #f3f4f6', background: editTt?.id === tt.id ? '#fffbeb' : 'white' }}>
-                          <td style={{ padding: '12px 14px', fontWeight: 700, color: '#111827' }}>{tt.name}</td>
-                          <td style={{ padding: '12px 14px', color: '#ef4444', fontWeight: 600 }}>{tt.price.toLocaleString('vi-VN')}</td>
-                          <td style={{ padding: '12px 14px', color: '#4b5563' }}>{tt.totalQty}</td>
-                          <td style={{ padding: '12px 14px' }}>
-                            <span style={{ color: tt.remainingQty === 0 ? '#dc2626' : '#059669', fontWeight: 600 }}>{tt.remainingQty}</span>
+                        <tr key={tt.id} style={{ background: editTt?.id === tt.id ? 'var(--warning-bg)' : undefined }}>
+                          <td style={{ fontWeight: 700 }}>{tt.name}</td>
+                          <td style={{ color: 'var(--danger)', fontWeight: 600 }}>{tt.price.toLocaleString('vi-VN')}</td>
+                          <td>{tt.totalQty}</td>
+                          <td>
+                            <span style={{ color: tt.remainingQty === 0 ? 'var(--danger)' : 'var(--success)', fontWeight: 600 }}>{tt.remainingQty}</span>
                           </td>
-                          <td style={{ padding: '12px 14px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span style={{ fontWeight: 600, color: '#374151' }}>{sold}</span>
-                              <div style={{ width: '60px', height: '6px', background: '#f1f5f9', borderRadius: '3px', overflow: 'hidden' }}>
-                                <div style={{ height: '100%', width: `${pct}%`, background: pct === 100 ? '#ef4444' : '#3b82f6', borderRadius: '3px' }} />
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ fontWeight: 600 }}>{sold}</span>
+                              <div className="progress" style={{ width: 60 }}>
+                                <div className="progress-bar" style={{ width: `${pct}%`, background: pct === 100 ? 'var(--danger)' : 'var(--primary)' }} />
                               </div>
-                              <span style={{ fontSize: '0.78rem', color: '#9ca3af' }}>{pct}%</span>
+                              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{pct}%</span>
                             </div>
                           </td>
-                          <td style={{ padding: '12px 14px', color: '#4b5563' }}>{tt.maxPerUser}/người</td>
-                          <td style={{ padding: '12px 14px', color: '#6b7280', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>{new Date(tt.saleStartsAt).toLocaleDateString('vi-VN')}</td>
-                          <td style={{ padding: '12px 14px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                            <button onClick={() => openEditTt(tt)} style={{ background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '5px 12px', cursor: 'pointer', marginRight: '6px', fontSize: '0.82rem', fontWeight: 500 }}>Sửa</button>
-                            <button onClick={() => handleDeleteTt(tt)} style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '6px', padding: '5px 12px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 500 }}>Xóa</button>
+                          <td>{tt.maxPerUser}/người</td>
+                          <td style={{ whiteSpace: 'nowrap', fontSize: 13, color: 'var(--text-2)' }}>{new Date(tt.saleStartsAt).toLocaleDateString('vi-VN')}</td>
+                          <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                            <button className="btn btn-secondary btn-sm" onClick={() => openEditTt(tt)} style={{ marginRight: 6 }}>Sửa</button>
+                            <button className="btn btn-danger btn-sm" onClick={() => handleDeleteTt(tt)}>Xóa</button>
                           </td>
                         </tr>
                       );
@@ -687,27 +592,30 @@ export default function AdminConcertDetail() {
         {/* ══════════════ TAB: AI BIO ══════════════ */}
         {activeTab === 'bio' && (
           <div>
-            <h2 style={{ margin: '0 0 20px', fontSize: '1.2rem', fontWeight: 700, color: '#111827' }}>AI Artist Bio</h2>
+            <h2 style={{ fontSize: 18, marginBottom: 20 }}>AI Artist Bio</h2>
 
             {/* Current bio */}
             {concert.artistBio ? (
-              <div style={{ marginBottom: '28px', background: 'linear-gradient(135deg, #f5f3ff, #ede9fe)', border: '1px solid #c4b5fd', borderLeft: '4px solid #7c3aed', borderRadius: '12px', padding: '20px 24px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-                  <span style={{ fontWeight: 700, color: '#7c3aed', fontSize: '0.82rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Bio hiện tại</span>
-                  <span style={{ marginLeft: 'auto', cursor: 'pointer', color: '#7c3aed', fontSize: '0.82rem', fontWeight: 600, border: '1px solid #c4b5fd', borderRadius: '6px', padding: '3px 10px', background: 'white' }}
-                    onClick={() => navigator.clipboard.writeText(concert.artistBio!)}>Copy</span>
+              <div className="card" style={{ marginBottom: 28, padding: '20px 24px', background: 'var(--primary-soft)', borderLeft: '4px solid var(--accent)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                  <span style={{ fontWeight: 700, color: 'var(--accent)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Bio hiện tại</span>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    style={{ marginLeft: 'auto' }}
+                    onClick={() => navigator.clipboard.writeText(concert.artistBio!)}
+                  >Copy</button>
                 </div>
-                <p style={{ color: '#3730a3', lineHeight: 1.8, margin: 0, fontSize: '0.97rem', whiteSpace: 'pre-wrap' }}>{concert.artistBio}</p>
+                <p style={{ color: 'var(--text)', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>{concert.artistBio}</p>
               </div>
             ) : (
-              <div style={{ marginBottom: '24px', background: '#f9fafb', border: '1.5px dashed #d1d5db', borderRadius: '12px', padding: '24px', textAlign: 'center', color: '#9ca3af' }}>
-                <p style={{ margin: 0, fontWeight: 500 }}>Chưa có AI Artist Bio. Upload press-kit PDF để tạo.</p>
+              <div className="empty-state" style={{ marginBottom: 24, border: '1.5px dashed var(--border-strong)', borderRadius: 'var(--radius-lg)' }}>
+                Chưa có AI Artist Bio. Upload press-kit PDF để tạo.
               </div>
             )}
 
             {/* Upload zone */}
-            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '24px' }}>
-              <h3 style={{ margin: '0 0 16px', fontSize: '1rem', fontWeight: 700, color: '#374151' }}>
+            <div className="card card-body">
+              <h3 style={{ fontSize: 15, marginBottom: 16 }}>
                 {concert.artistBio ? 'Tạo lại Bio (upload PDF mới)' : 'Upload Press-kit PDF'}
               </h3>
 
@@ -717,32 +625,23 @@ export default function AdminConcertDetail() {
                 onDrop={handleBioDrop}
                 onClick={() => document.getElementById('bio-pdf-input')?.click()}
                 style={{
-                  border: `2px dashed ${bioDragOver ? '#7c3aed' : pdfFile ? '#10b981' : '#d1d5db'}`,
-                  borderRadius: '10px', padding: '32px 20px', textAlign: 'center', cursor: 'pointer',
-                  background: bioDragOver ? '#f5f3ff' : pdfFile ? '#f0fdf4' : '#fafafa', transition: 'all 0.2s',
-                  marginBottom: '16px',
+                  border: `2px dashed ${bioDragOver ? 'var(--accent)' : pdfFile ? 'var(--success)' : 'var(--border-strong)'}`,
+                  borderRadius: 'var(--radius-md)', padding: '32px 20px', textAlign: 'center', cursor: 'pointer',
+                  background: bioDragOver ? 'var(--primary-soft)' : pdfFile ? 'var(--success-bg)' : 'var(--surface-2)',
+                  marginBottom: 16,
                 }}
               >
                 <input id="bio-pdf-input" type="file" accept="application/pdf" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f?.type === 'application/pdf') { setPdfFile(f); setBioError(''); } else if (f) setBioError('Chỉ nhận PDF.'); }} />
                 {pdfFile ? (
-                  <><div style={{ fontWeight: 700, color: '#059669' }}>{pdfFile.name}</div><div style={{ color: '#6b7280', fontSize: '0.82rem' }}>{(pdfFile.size / 1024).toFixed(1)} KB</div></>
+                  <><div style={{ fontWeight: 700, color: 'var(--success)' }}>{pdfFile.name}</div><div style={{ color: 'var(--text-2)', fontSize: 13 }}>{(pdfFile.size / 1024).toFixed(1)} KB</div></>
                 ) : (
-                  <><div style={{ fontWeight: 600, color: '#374151' }}>Kéo thả PDF hoặc bấm để chọn</div><div style={{ color: '#9ca3af', fontSize: '0.82rem', marginTop: '4px' }}>Chỉ nhận PDF · Tối đa 20MB</div></>
+                  <><div style={{ fontWeight: 600 }}>Kéo thả PDF hoặc bấm để chọn</div><div style={{ color: 'var(--text-3)', fontSize: 13, marginTop: 4 }}>Chỉ nhận PDF · Tối đa 20MB</div></>
                 )}
               </div>
 
-              {bioError && <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '10px 14px', color: '#dc2626', marginBottom: '14px', fontSize: '0.9rem' }}>{bioError}</div>}
+              {bioError && <div className="alert alert-danger" style={{ marginBottom: 14 }}>{bioError}</div>}
 
-              <button
-                onClick={handleUploadBio}
-                disabled={isUploadingBio || !pdfFile}
-                style={{
-                  padding: '12px 28px', border: 'none', borderRadius: '10px', fontWeight: 700, fontSize: '0.95rem',
-                  cursor: isUploadingBio || !pdfFile ? 'not-allowed' : 'pointer',
-                  background: isUploadingBio || !pdfFile ? '#e5e7eb' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  color: isUploadingBio || !pdfFile ? '#9ca3af' : 'white',
-                }}
-              >
+              <button className="btn btn-primary" onClick={handleUploadBio} disabled={isUploadingBio || !pdfFile}>
                 {isUploadingBio ? 'AI đang phân tích...' : 'Tạo Bio bằng AI'}
               </button>
             </div>
@@ -752,13 +651,13 @@ export default function AdminConcertDetail() {
         {/* ══════════════ TAB: GUEST LIST ══════════════ */}
         {activeTab === 'guests' && (
           <div>
-            <h2 style={{ margin: '0 0 20px', fontSize: '1.2rem', fontWeight: 700, color: '#111827' }}>Guest List — CSV Import</h2>
+            <h2 style={{ fontSize: 18, marginBottom: 20 }}>Guest List — CSV Import</h2>
 
             {/* Upload zone */}
-            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '24px', marginBottom: '28px' }}>
-              <h3 style={{ margin: '0 0 14px', fontSize: '1rem', fontWeight: 700, color: '#374151' }}>Import CSV mới</h3>
+            <div className="card card-body" style={{ marginBottom: 28 }}>
+              <h3 style={{ fontSize: 15, marginBottom: 14 }}>Import CSV mới</h3>
 
-              <div style={{ background: '#eff6ff', borderRadius: '8px', border: '1px solid #bfdbfe', padding: '10px 14px', marginBottom: '14px', fontSize: '0.82rem', color: '#1e40af' }}>
+              <div className="alert alert-info" style={{ marginBottom: 14 }}>
                 <strong>Files demo:</strong> <code>guests-valid.csv</code> · <code>guests-with-errors.csv</code> · <code>guests-duplicates.csv</code>
               </div>
 
@@ -768,66 +667,54 @@ export default function AdminConcertDetail() {
                 onDrop={handleCsvDrop}
                 onClick={() => document.getElementById('guest-csv-input')?.click()}
                 style={{
-                  border: `2px dashed ${csvDragOver ? '#0891b2' : csvFile ? '#10b981' : '#d1d5db'}`,
-                  borderRadius: '10px', padding: '28px 20px', textAlign: 'center', cursor: 'pointer',
-                  background: csvDragOver ? '#f0f9ff' : csvFile ? '#f0fdf4' : '#fafafa', transition: 'all 0.2s',
-                  marginBottom: '14px',
+                  border: `2px dashed ${csvDragOver ? 'var(--info)' : csvFile ? 'var(--success)' : 'var(--border-strong)'}`,
+                  borderRadius: 'var(--radius-md)', padding: '28px 20px', textAlign: 'center', cursor: 'pointer',
+                  background: csvDragOver ? 'var(--info-bg)' : csvFile ? 'var(--success-bg)' : 'var(--surface-2)',
+                  marginBottom: 14,
                 }}
               >
                 <input id="guest-csv-input" type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f && (f.name.endsWith('.csv') || f.type === 'text/csv')) { setCsvFile(f); setCsvError(''); } else if (f) setCsvError('Chỉ nhận CSV.'); }} />
                 {csvFile ? (
-                  <><div style={{ fontWeight: 700, color: '#059669' }}>{csvFile.name}</div><div style={{ color: '#6b7280', fontSize: '0.82rem' }}>{(csvFile.size / 1024).toFixed(1)} KB</div></>
+                  <><div style={{ fontWeight: 700, color: 'var(--success)' }}>{csvFile.name}</div><div style={{ color: 'var(--text-2)', fontSize: 13 }}>{(csvFile.size / 1024).toFixed(1)} KB</div></>
                 ) : (
-                  <><div style={{ fontWeight: 600, color: '#374151' }}>Kéo thả CSV hoặc bấm để chọn</div></>
+                  <div style={{ fontWeight: 600 }}>Kéo thả CSV hoặc bấm để chọn</div>
                 )}
               </div>
 
-              {csvError && <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '10px 14px', color: '#dc2626', marginBottom: '12px', fontSize: '0.9rem' }}>{csvError}</div>}
+              {csvError && <div className="alert alert-danger" style={{ marginBottom: 12 }}>{csvError}</div>}
 
-              <button
-                onClick={handleUploadCsv}
-                disabled={isUploadingCsv || !csvFile}
-                style={{
-                  padding: '11px 24px', border: 'none', borderRadius: '8px', fontWeight: 700, fontSize: '0.9rem',
-                  cursor: isUploadingCsv || !csvFile ? 'not-allowed' : 'pointer',
-                  background: isUploadingCsv || !csvFile ? '#e5e7eb' : 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
-                  color: isUploadingCsv || !csvFile ? '#9ca3af' : 'white',
-                }}
-              >
+              <button className="btn btn-primary" onClick={handleUploadCsv} disabled={isUploadingCsv || !csvFile}>
                 {isUploadingCsv ? 'Đang gửi...' : 'Import CSV'}
               </button>
             </div>
 
             {/* Batch history */}
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#374151' }}>Lịch sử Import</h3>
-                <button onClick={() => { fetchBatches(); fetchGuests(); }} style={{ background: 'none', border: '1px solid #d1d5db', borderRadius: '6px', padding: '5px 12px', cursor: 'pointer', color: '#4b5563', fontSize: '0.82rem' }}>Refresh</button>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <h3 style={{ fontSize: 15 }}>Lịch sử Import</h3>
+                <button className="btn btn-secondary btn-sm" onClick={() => { fetchBatches(); fetchGuests(); }}>Refresh</button>
               </div>
 
               {batches.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '32px', color: '#9ca3af', background: '#f9fafb', borderRadius: '10px', border: '1px solid #f3f4f6' }}>Chưa có batch import nào.</div>
+                <div className="empty-state">Chưa có batch import nào.</div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {batches.map(b => {
-                    const statusMap: Record<string, [string, string, string, string]> = {
-                      SUCCESS: ['', '#059669', '#f0fdf4', '#bbf7d0'],
-                      FAILED: ['', '#dc2626', '#fef2f2', '#fecaca'],
-                      PROCESSING: ['', '#d97706', '#fffbeb', '#fde68a'],
-                    };
-                    const [icon, sc2, sbg2, sbd2] = statusMap[b.status] ?? ['', '#9ca3af', '#f9fafb', '#e5e7eb'];
+                    const badgeCls =
+                      b.status === 'SUCCESS' ? 'badge badge-success' :
+                        b.status === 'FAILED' ? 'badge badge-danger' :
+                          b.status === 'PROCESSING' ? 'badge badge-warning' : 'badge badge-muted';
                     return (
-                      <div key={b.id} style={{ background: 'white', border: '1px solid #f3f4f6', borderRadius: '10px', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-                        {icon && <span style={{ fontSize: '1.2rem' }}>{icon}</span>}
-                        <div style={{ flex: 1, minWidth: '160px' }}>
-                          <div style={{ fontWeight: 600, color: '#111827', fontSize: '0.9rem' }}>{b.filename}</div>
-                          <div style={{ color: '#9ca3af', fontSize: '0.78rem' }}>{new Date(b.createdAt).toLocaleString('vi-VN')}</div>
+                      <div key={b.id} className="card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1, minWidth: 160 }}>
+                          <div style={{ fontWeight: 600 }}>{b.filename}</div>
+                          <div style={{ color: 'var(--text-3)', fontSize: 12 }}>{new Date(b.createdAt).toLocaleString('vi-VN')}</div>
                         </div>
-                        <span style={badgeStyle(sc2, sbg2, sbd2)}>{b.status}</span>
-                        <div style={{ display: 'flex', gap: '12px', fontSize: '0.82rem', fontWeight: 600 }}>
-                          <span style={{ color: '#374151' }}>{b.rowsTotal} dòng</span>
-                          <span style={{ color: '#059669' }}>{b.rowsOk}</span>
-                          <span style={{ color: '#dc2626' }}>{b.rowsFailed}</span>
+                        <span className={badgeCls}>{b.status}</span>
+                        <div style={{ display: 'flex', gap: 12, fontSize: 13, fontWeight: 600 }}>
+                          <span>{b.rowsTotal} dòng</span>
+                          <span style={{ color: 'var(--success)' }}>{b.rowsOk}</span>
+                          <span style={{ color: 'var(--danger)' }}>{b.rowsFailed}</span>
                         </div>
                       </div>
                     );
@@ -837,32 +724,30 @@ export default function AdminConcertDetail() {
             </div>
 
             {/* Current Guest List */}
-            <div style={{ marginTop: '40px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#374151' }}>👥 Danh sách Khách mời ({guests.length})</h3>
-              </div>
+            <div style={{ marginTop: 40 }}>
+              <h3 style={{ fontSize: 15, marginBottom: 14 }}>Danh sách Khách mời ({guests.length})</h3>
 
               {guests.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '32px', color: '#9ca3af', background: '#f9fafb', borderRadius: '10px', border: '1px solid #f3f4f6' }}>Chưa có khách mời nào.</div>
+                <div className="empty-state">Chưa có khách mời nào.</div>
               ) : (
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                <div className="table-wrap">
+                  <table className="table">
                     <thead>
-                      <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                        <th style={{ padding: '12px', textAlign: 'left', color: '#475569', fontWeight: 600 }}>Tên (fullName)</th>
-                        <th style={{ padding: '12px', textAlign: 'left', color: '#475569', fontWeight: 600 }}>Căn cước (docId)</th>
-                        <th style={{ padding: '12px', textAlign: 'left', color: '#475569', fontWeight: 600 }}>Khu vực (zone)</th>
-                        <th style={{ padding: '12px', textAlign: 'center', color: '#475569', fontWeight: 600 }}>Trạng thái</th>
+                      <tr>
+                        <th>Tên (fullName)</th>
+                        <th>Căn cước (docId)</th>
+                        <th>Khu vực (zone)</th>
+                        <th style={{ textAlign: 'center' }}>Trạng thái</th>
                       </tr>
                     </thead>
                     <tbody>
                       {guests.map(g => (
-                        <tr key={g.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                          <td style={{ padding: '12px', color: '#0f172a', fontWeight: 500 }}>{g.fullName}</td>
-                          <td style={{ padding: '12px', color: '#64748b' }}>{g.docId || '-'}</td>
-                          <td style={{ padding: '12px', color: '#64748b' }}>{g.zone || '-'}</td>
-                          <td style={{ padding: '12px', textAlign: 'center' }}>
-                            <span style={badgeStyle(...(g.status === 'CHECKED_IN' ? ['#059669', '#f0fdf4', '#bbf7d0'] : ['#d97706', '#fffbeb', '#fde68a']) as [string, string, string])}>
+                        <tr key={g.id}>
+                          <td style={{ fontWeight: 500 }}>{g.fullName}</td>
+                          <td style={{ color: 'var(--text-2)' }}>{g.docId || '-'}</td>
+                          <td style={{ color: 'var(--text-2)' }}>{g.zone || '-'}</td>
+                          <td style={{ textAlign: 'center' }}>
+                            <span className={g.status === 'CHECKED_IN' ? 'badge badge-success' : 'badge badge-warning'}>
                               {g.status}
                             </span>
                           </td>

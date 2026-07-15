@@ -15,6 +15,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { GuestsModule } from './guests/guests.module';
 import { AiBioModule } from './ai-bio/ai-bio.module';
 import { CheckinModule } from './checkin/checkin.module';
+import { StatsModule } from './stats/stats.module';
 
 @Module({
   imports: [
@@ -49,7 +50,8 @@ import { CheckinModule } from './checkin/checkin.module';
     NotificationsModule,
     GuestsModule,
     AiBioModule,
-    CheckinModule
+    CheckinModule,
+    StatsModule
   ],
   controllers: [AppController],
   providers: [AppService],
