@@ -470,9 +470,8 @@ export default function AdminConcertDetail() {
 
             {/* Danger zone */}
             <div style={{ marginTop: 40, padding: 20, border: '1.5px solid var(--danger-border)', borderRadius: 'var(--radius-lg)', background: 'var(--danger-bg)' }}>
-              <h3 style={{ color: 'var(--danger)', fontSize: 16, marginBottom: 8 }}>Vùng nguy hiểm</h3>
               <p style={{ color: 'var(--danger)', fontSize: 14, marginBottom: 14 }}>
-                Hủy concert sẽ void toàn bộ vé VALID và gửi thông báo đến người mua. Không thể hoàn tác.
+                Hủy concert sẽ gửi thông báo đến người mua vé concert đã hủy.
               </p>
               <button
                 className="btn btn-danger"
