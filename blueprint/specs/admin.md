@@ -8,7 +8,7 @@ Các endpoint quản trị cho phép `ORGANIZER` quản lý vòng đời concert
 
 ### 1. Tạo và cấu hình concert
 
-1. `POST /admin/concerts` tạo concert, mặc định `DRAFT`. Dữ liệu hỗ trợ `title`, `slug`, `venue`, `startsAt`, `artistBio`, `artists[]`, `bioSourceUrl`, `seatMapSvg` và `status`.
+1. `POST /admin/concerts` tạo concert, mặc định `DRAFT`. Dữ liệu hỗ trợ `title`, `slug`, `venue`, `startsAt`, `artistBio`, `artists[]`, `bioSourceUrl`, `seatMapSvg`, `imageUrl` và `status`. Ảnh bìa có thể upload qua `POST /admin/upload/image` (multipart field `file`), trả về `{ imageUrl }` để gắn vào concert.
 2. `POST /admin/ticket-types` tạo loại vé; `remainingQty` được khởi tạo bằng `totalQty`.
 3. `PATCH /admin/concerts/:id` cập nhật concert; `PATCH /admin/ticket-types/:id` cập nhật loại vé.
 4. Đổi concert sang `ON_SALE`; từng loại vé chỉ bán sau `saleStartsAt`.
@@ -16,7 +16,14 @@ Các endpoint quản trị cho phép `ORGANIZER` quản lý vòng đời concert
 
 ### 2. Theo dõi doanh thu
 
-`GET /admin/concerts/:id/stats` tính trực tiếp từ PostgreSQL: tổng doanh thu và số đơn `PAID`, cùng `soldQty`, `remainingQty`, doanh thu theo từng loại vé.
+- `GET /admin/concerts/:id/stats` tính trực tiếp từ PostgreSQL cho một concert: tổng doanh thu và số đơn `PAID`, cùng `soldQty`, `remainingQty`, doanh thu theo từng loại vé.
+- `GET /admin/stats/overview?days=30` phục vụ dashboard tổng quan toàn hệ thống, trả về:
+  - `totals`: tổng doanh thu, tổng vé bán, tổng đơn `PAID`, tổng concert và số vé đã check-in (`USED`).
+  - `salesByDay`: chuỗi thời gian số vé/doanh thu theo ngày (mặc định 30 ngày, giới hạn 1–90; ngày quy đổi theo giờ Việt Nam, ngày không có giao dịch được điền `0`).
+  - `ticketTypeBreakdown`: số vé bán và doanh thu theo từng loại vé (kèm tên concert) cho biểu đồ cơ cấu.
+  - `concerts`: từng concert với sức chứa, vé đã bán và doanh thu.
+
+Cả hai endpoint chỉ tính đơn `PAID` (không dùng `totalQty - remainingQty` vì `remainingQty` giảm ngay khi giữ chỗ), không cache và đọc trực tiếp DB. Chuỗi theo ngày dựa trên `Order.createdAt` của đơn `PAID` vì schema chưa có cột `paidAt` riêng.
 
 ### 3. Hủy concert
 
@@ -59,3 +66,5 @@ Các endpoint quản trị cho phép `ORGANIZER` quản lý vòng đời concert
 - Không thể giảm tổng số lượng xuống thấp hơn số đã bán/giữ.
 - Hủy concert hoàn đúng kho `PENDING`, hủy vé `VALID` và chỉ phát một event chứa đủ `buyerUserIds`.
 - Stats sau đơn `PAID` phản ánh đúng tổng và số liệu từng loại vé.
+- `AUDIENCE`/`SCANNER` gọi `GET /admin/stats/overview` → `403`; `ORGANIZER` nhận đủ `totals`, `salesByDay` (đủ số ngày, có điền `0`), `ticketTypeBreakdown` và `concerts`.
+- Đơn `PENDING`/`FAILED`/`EXPIRED` không được tính vào doanh thu hoặc số vé bán ở cả hai endpoint stats.

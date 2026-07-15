@@ -208,6 +208,7 @@ erDiagram
     string artistBio nullable
     string_array artists
     string bioSourceUrl nullable
+    string imageUrl nullable
     string seatMapSvg nullable
     datetime createdAt
   }

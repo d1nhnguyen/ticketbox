@@ -116,10 +116,10 @@ Luồng backend giữ stock trong transaction có row lock, enforce `maxPerUser`
 
 ### 5.2 Ban tổ chức
 
-1. Đăng nhập tài khoản Organizer; hệ thống chuyển tới `/admin`.
-2. Tạo/sửa/hủy concert và cấu hình ticket type.
-3. Mở chi tiết concert để xem lượng bán và doanh thu từ order `PAID`.
-4. Upload Guest List CSV hoặc upload PDF để tạo Artist Bio.
+1. Đăng nhập tài khoản Organizer; hệ thống chuyển tới `/admin` — trang **Tổng quan** với thống kê toàn hệ thống từ `GET /admin/stats/overview`: doanh thu, vé đã bán, tỷ lệ check-in, biểu đồ vé bán theo ngày và cơ cấu loại vé (chỉ tính order `PAID`).
+2. Mở mục **Sự kiện** trên sidebar (`/admin/concerts`) để tạo/sửa/hủy concert và cấu hình ticket type.
+3. Mở chi tiết concert để xem lượng bán và doanh thu từng loại vé từ order `PAID`.
+4. Upload Guest List CSV hoặc upload PDF để tạo Artist Bio (mục riêng trên sidebar hoặc tab trong chi tiết concert).
 
 Dữ liệu mẫu:
 
